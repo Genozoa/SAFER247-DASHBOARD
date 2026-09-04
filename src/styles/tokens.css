@@ -1,0 +1,17 @@
+/* Design tokens: colors, spacing, radii */
+:root {
+  --cc-color-navy: #0b2b4a;
+  --cc-color-surface: #ffffff;
+  --cc-color-muted: #f3f4f6;
+  --cc-color-text: #2b2b2b;
+  --cc-color-accent: #ff6b35;
+
+  --cc-space-xxs: 4px;
+  --cc-space-xs: 8px;
+  --cc-space-s: 12px;
+  --cc-space-m: 16px;
+  --cc-space-l: 24px;
+
+  --cc-radius-s: 6px;
+  --cc-radius-m: 10px;
+}

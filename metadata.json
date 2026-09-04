@@ -1,0 +1,6 @@
+{
+  "name": "SAFER 247 Command Center",
+  "description": "Radio Frequency-based emergency messaging and situational awareness command center dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
