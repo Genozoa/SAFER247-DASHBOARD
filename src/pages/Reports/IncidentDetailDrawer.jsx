@@ -36,7 +36,7 @@ export default function IncidentDetailDrawer({ item, onClose }) {
           <dd>{item.location}</dd>
 
           <dt>Coordinates</dt>
-          <dd>14.5995, 120.9842</dd>
+          <dd>{item.coordinates || (item.lat && item.lng ? `${item.lat.toFixed(4)}, ${item.lng.toFixed(4)}` : '7.8380, 125.2140')}</dd>
 
           <dt>Description</dt>
           <dd>{item.text}</dd>

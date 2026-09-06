@@ -1,12 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { LocateFixed, RotateCcw, X, Eye } from 'lucide-react';
+import {
+  LocateFixed,
+  RotateCcw,
+  X,
+  Eye,
+  Radio,
+  Navigation,
+  Activity,
+  Layers,
+  Search,
+} from 'lucide-react';
 import SelectDropdown from '../../components/common/SelectDropdown';
+import LeafletMap from '../../components/map/LeafletMap';
+import AprsTelemetryDrawer from '../../components/map/AprsTelemetryDrawer';
 import {
   INCIDENT_TYPES,
   BARANGAY_OPTIONS,
   DATE_RANGE_OPTIONS,
   INCIDENTS,
+  APRS_RESPONDERS,
+  BARANGAY_COORDINATES,
   isWithinDateRange,
 } from '../../data/mockData';
 
@@ -24,7 +38,9 @@ export default function MapViewPage() {
   const [selectedBarangay, setSelectedBarangay] = useState('All Barangays');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIncident, setSelectedIncident] = useState(null);
-  const [zoomLevel, setZoomLevel] = useState(1);
+  const [selectedStation, setSelectedStation] = useState(null);
+  const [showBreadcrumbs, setShowBreadcrumbs] = useState(true);
+  const [aprsList, setAprsList] = useState(APRS_RESPONDERS);
 
   // Auto-select incident if passed in search params
   useEffect(() => {
@@ -35,6 +51,31 @@ export default function MapViewPage() {
       }
     }
   }, [incidentIdParam]);
+
+  // Periodic APRS ticker simulation: updates "last heard" counter to simulate real VHF telemetry
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setAprsList((prev) =>
+        prev.map((station) => {
+          const delta = Math.floor(Math.random() * 2) + 1;
+          const nextSec = (station.lastHeardSeconds || 5) + delta;
+          // Every ~45-60s reset beacon packet
+          if (nextSec > 60) {
+            return {
+              ...station,
+              lastHeardSeconds: Math.floor(Math.random() * 5) + 1,
+            };
+          }
+          return {
+            ...station,
+            lastHeardSeconds: nextSec,
+          };
+        })
+      );
+    }, 3000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   // Filter incidents based on active criteria
   const filteredIncidents = INCIDENTS.filter((item) => {
@@ -60,40 +101,6 @@ export default function MapViewPage() {
     return true;
   });
 
-  const getMarkerClass = (type) => {
-    switch (type) {
-      case 'Fire':
-        return 'fire';
-      case 'Flood':
-        return 'flood';
-      case 'Vehicular Accident':
-        return 'vehicle';
-      case 'Medical':
-        return 'medical';
-      case 'Landslide':
-        return 'landslide';
-      default:
-        return 'fire';
-    }
-  };
-
-  const getMarkerSymbol = (type) => {
-    switch (type) {
-      case 'Fire':
-        return '♨';
-      case 'Flood':
-        return '≋';
-      case 'Vehicular Accident':
-        return '▱';
-      case 'Medical':
-        return '✚';
-      case 'Landslide':
-        return '⛰';
-      default:
-        return '●';
-    }
-  };
-
   const resetFilters = () => {
     setSelectedType('All Types');
     setSelectedDateRange('Last 30 Days');
@@ -101,15 +108,25 @@ export default function MapViewPage() {
     setSearchQuery('');
   };
 
+  const handleSelectIncident = useCallback((incident) => {
+    setSelectedIncident(incident);
+    setSelectedStation(null);
+  }, []);
+
+  const handleSelectStation = useCallback((station) => {
+    setSelectedStation(station);
+    setSelectedIncident(null);
+  }, []);
+
   return (
     <div className="page map-page">
       {/* Filters & Mode Tabs Bar */}
       <div className="filter-row">
         <label>
-          <span>Search</span>
+          <span>Search Incident / Call</span>
           <input
             type="text"
-            placeholder="⌕  Search incidents in San Fernando..."
+            placeholder="⌕ Search incidents or APRS callsigns..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -151,128 +168,82 @@ export default function MapViewPage() {
               key={m}
               type="button"
               className={mode === m ? 'active' : ''}
-              onClick={() => setMode(m)}
+              onClick={() => {
+                setMode(m);
+                setSelectedStation(null);
+              }}
             >
-              {m}
+              {m === 'Tracking' ? 'APRS Tracking' : m}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Interactive Map Canvas */}
-      <div className="map-canvas">
-        {/* Navigation Controls */}
-        <div className="map-controls">
-          <button
-            type="button"
-            aria-label="Zoom in"
-            onClick={() => setZoomLevel((z) => Math.min(z + 0.15, 1.6))}
-          >
-            +
-          </button>
-          <button
-            type="button"
-            aria-label="Zoom out"
-            onClick={() => setZoomLevel((z) => Math.max(z - 0.15, 0.85))}
-          >
-            −
-          </button>
-          <button
-            type="button"
-            aria-label="Recenter map"
-            title="Recenter to San Fernando, Bukidnon"
-            onClick={() => {
-              setZoomLevel(1);
-              setSelectedIncident(null);
-            }}
-          >
-            <LocateFixed size={20} />
-          </button>
+      {/* APRS Quick Status Bar for Tracking Mode */}
+      {mode === 'Tracking' && (
+        <div className="aprs-top-bar">
+          <div className="aprs-bar-title">
+            <Radio size={16} className="radio-pulse-icon" />
+            <span>VHF APRS 144.390 MHz Live Telemetry</span>
+            <small>({aprsList.length} Units Active)</small>
+          </div>
+          <div className="aprs-station-chips">
+            {aprsList.map((st) => {
+              const isSelected = selectedStation?.callsign === st.callsign;
+              return (
+                <button
+                  key={st.callsign}
+                  type="button"
+                  className={`aprs-chip ${isSelected ? 'active' : ''}`}
+                  onClick={() => handleSelectStation(st)}
+                >
+                  <span className="chip-dot" />
+                  <strong>{st.callsign}</strong>
+                  <small>{st.speed > 0 ? `${st.speed} km/h` : 'Fixed'}</small>
+                </button>
+              );
+            })}
+          </div>
+          <label className="breadcrumbs-toggle">
+            <input
+              type="checkbox"
+              checked={showBreadcrumbs}
+              onChange={(e) => setShowBreadcrumbs(e.target.checked)}
+            />
+            <span>Breadcrumbs</span>
+          </label>
         </div>
+      )}
 
-        {/* Municipality Badge */}
-        <div className="map-area-badge">
-          <span>Municipality of San Fernando, Bukidnon</span>
-          <small>{filteredIncidents.length} active marker{filteredIncidents.length === 1 ? '' : 's'}</small>
-        </div>
-
-        {/* Incident Markers */}
-        <div
-          className="map-layer"
-          style={{
-            transform: `scale(${zoomLevel})`,
-            transformOrigin: 'center center',
-            transition: 'transform 0.2s ease-out',
-            width: '100%',
-            height: '100%',
-            position: 'absolute',
-            inset: 0,
-          }}
-        >
-          {filteredIncidents.map((incident) => {
-            const isSelected = selectedIncident?.id === incident.id;
-            return (
-              <div
-                key={incident.id}
-                className={`marker ${getMarkerClass(incident.type)} ${
-                  isSelected ? 'selected-marker' : ''
-                }`}
-                style={{
-                  top: incident.mapPos.top,
-                  left: incident.mapPos.left,
-                }}
-                role="button"
-                tabIndex={0}
-                title={`${incident.type} in ${incident.barangay} (${incident.id})`}
-                onClick={() => setSelectedIncident(incident)}
-                onKeyDown={(e) => e.key === 'Enter' && setSelectedIncident(incident)}
-              >
-                <span>{getMarkerSymbol(incident.type)}</span>
-                <b className="marker-label">{incident.barangay}</b>
-              </div>
-            );
-          })}
-
-          {/* Tracking Mode Responders */}
-          {mode === 'Tracking' && (
-            <>
-              <div className="responder alpha">
-                ♙<span>Responder Alpha-01 (Kawayan)</span>
-              </div>
-              <div className="responder bravo">
-                ♙<span>Responder Bravo-02 (Halapitan)</span>
-              </div>
-            </>
-          )}
-
-          {/* Heatmap Mode Overlays */}
-          {mode === 'Heatmap' && (
-            <>
-              <div className="heat high" />
-              <div className="heat medium" />
-              <div className="heat low" />
-            </>
-          )}
-        </div>
+      {/* Real Open-Source Leaflet Map Container */}
+      <div className="map-canvas leaflet-wrapper-container">
+        <LeafletMap
+          mode={mode}
+          incidents={filteredIncidents}
+          aprsStations={aprsList}
+          selectedIncident={selectedIncident}
+          selectedStation={selectedStation}
+          selectedBarangay={selectedBarangay}
+          onSelectIncident={handleSelectIncident}
+          onSelectStation={handleSelectStation}
+          onSelectBarangay={setSelectedBarangay}
+          showBreadcrumbs={showBreadcrumbs}
+        />
 
         {/* Empty State Banner */}
-        {filteredIncidents.length === 0 && (
+        {filteredIncidents.length === 0 && mode === 'Markers' && (
           <div className="map-empty-state">
             <p>No incidents match the selected criteria.</p>
-            <span>Type: <b>{selectedType}</b> • Range: <b>{selectedDateRange}</b> • Location: <b>{selectedBarangay}</b></span>
+            <span>
+              Type: <b>{selectedType}</b> • Range: <b>{selectedDateRange}</b> • Location:{' '}
+              <b>{selectedBarangay}</b>
+            </span>
             <button type="button" onClick={resetFilters}>
               <RotateCcw size={14} />
               <span>Reset Filters</span>
             </button>
           </div>
         )}
-
-        {/* Map Context Note */}
-        <div className="map-note">
-          {mode === 'Heatmap'
-            ? 'Heatmap shows concentration of incident reports in San Fernando.'
-            : 'Click on any marker to inspect incident details'}
-        </div>
 
         {/* Map Legend */}
         <div className="legend">
@@ -287,12 +258,12 @@ export default function MapViewPage() {
         {/* Heatmap Insights Sidebar */}
         {mode === 'Heatmap' && (
           <aside className="heat-insights">
-            <h2>Heatmap Insights</h2>
+            <h2>Heatmap Risk Density</h2>
             <b>San Fernando, Bukidnon</b>
             <article>
               <b>Brgy. Little Baguio (Sitio Dayag)</b>
               <p>
-                <strong>12 reports</strong> recorded (high landslide & flood risk)
+                <strong>12 reports</strong> recorded (high landslide & flood risk corridors)
               </p>
               <button
                 type="button"
@@ -301,13 +272,13 @@ export default function MapViewPage() {
                   setMode('Markers');
                 }}
               >
-                Filter Little Baguio Markers
+                Inspect Little Baguio Incidents
               </button>
             </article>
             <article>
-              <b>Brgy. Halapitan (Tigwa Basin)</b>
+              <b>Brgy. Halapitan (Tigwa River Basin)</b>
               <p>
-                <strong>8 reports</strong> recorded (river water surge)
+                <strong>8 reports</strong> recorded (river water surge & evacuation staging)
               </p>
               <button
                 type="button"
@@ -316,13 +287,28 @@ export default function MapViewPage() {
                   setMode('Markers');
                 }}
               >
-                Filter Halapitan Markers
+                Inspect Halapitan Incidents
+              </button>
+            </article>
+            <article>
+              <b>Brgy. Kalagangan (Sayre Highway)</b>
+              <p>
+                <strong>6 reports</strong> recorded (high collision & junction incidents)
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedBarangay('Kalagangan');
+                  setMode('Markers');
+                }}
+              >
+                Inspect Kalagangan Incidents
               </button>
             </article>
           </aside>
         )}
 
-        {/* Marker Detail Popup */}
+        {/* Incident Detail Card */}
         {selectedIncident && (
           <div className="marker-detail">
             <button
@@ -338,7 +324,7 @@ export default function MapViewPage() {
               <code>{selectedIncident.id}</code>
             </label>
             <label>
-              Sender
+              Sender / Unit
               <b>{selectedIncident.sender}</b>
             </label>
             <label>
@@ -369,7 +355,21 @@ export default function MapViewPage() {
             </button>
           </div>
         )}
+
+        {/* APRS Station Telemetry Drawer */}
+        {selectedStation && (
+          <AprsTelemetryDrawer
+            station={selectedStation}
+            onClose={() => setSelectedStation(null)}
+            onFocusStation={(station) => {
+              if (window.leafletMapInstance) {
+                window.leafletMapInstance.flyTo([station.lat, station.lng], 15);
+              }
+            }}
+          />
+        )}
       </div>
     </div>
   );
 }
+
