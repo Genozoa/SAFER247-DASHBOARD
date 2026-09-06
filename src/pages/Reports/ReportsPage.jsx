@@ -96,7 +96,7 @@ export default function ReportsPage() {
         </label>
 
         <label>
-          <span>Barangay (San Fernando, Bukidnon)</span>
+          <span>Barangays</span>
           <SelectDropdown
             value={selectedBarangay}
             onChange={setSelectedBarangay}

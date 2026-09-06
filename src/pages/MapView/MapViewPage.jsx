@@ -10,6 +10,8 @@ import {
   Activity,
   Layers,
   Search,
+  MapPin,
+  Flame,
 } from 'lucide-react';
 import SelectDropdown from '../../components/common/SelectDropdown';
 import LeafletMap from '../../components/map/LeafletMap';
@@ -118,21 +120,40 @@ export default function MapViewPage() {
     setSelectedIncident(null);
   }, []);
 
+  const hasActiveFilters =
+    selectedType !== 'All Types' ||
+    selectedDateRange !== 'Last 30 Days' ||
+    selectedBarangay !== 'All Barangays' ||
+    searchQuery.trim() !== '';
+
   return (
     <div className="page map-page">
       {/* Filters & Mode Tabs Bar */}
-      <div className="filter-row">
-        <label>
+      <div className="filter-row map-filter-toolbar">
+        <label className="filter-label search-field">
           <span>Search Incident / Call</span>
-          <input
-            type="text"
-            placeholder="⌕ Search incidents or APRS callsigns..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+          <div className="search-input-box">
+            <Search size={14} className="search-icon" />
+            <input
+              type="text"
+              placeholder="Search incidents or callsigns..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                className="clear-input-btn"
+                onClick={() => setSearchQuery('')}
+                title="Clear search"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
         </label>
 
-        <label>
+        <label className="filter-label dropdown-field">
           <span>Incident Type</span>
           <SelectDropdown
             value={selectedType}
@@ -142,7 +163,7 @@ export default function MapViewPage() {
           />
         </label>
 
-        <label>
+        <label className="filter-label dropdown-field">
           <span>Date Range</span>
           <SelectDropdown
             value={selectedDateRange}
@@ -152,8 +173,8 @@ export default function MapViewPage() {
           />
         </label>
 
-        <label>
-          <span>Barangay (San Fernando, Bukidnon)</span>
+        <label className="filter-label dropdown-field bgy-field">
+          <span>Barangays</span>
           <SelectDropdown
             value={selectedBarangay}
             onChange={setSelectedBarangay}
@@ -162,20 +183,55 @@ export default function MapViewPage() {
           />
         </label>
 
+        {hasActiveFilters && (
+          <button
+            type="button"
+            className="filter-reset-btn"
+            onClick={resetFilters}
+            title="Reset filters to default"
+          >
+            <RotateCcw size={13} />
+            <span>Reset</span>
+          </button>
+        )}
+
         <div className="map-tabs">
-          {MAP_MODES.map((m) => (
-            <button
-              key={m}
-              type="button"
-              className={mode === m ? 'active' : ''}
-              onClick={() => {
-                setMode(m);
-                setSelectedStation(null);
-              }}
-            >
-              {m === 'Tracking' ? 'APRS Tracking' : m}
-            </button>
-          ))}
+          <button
+            type="button"
+            className={mode === 'Markers' ? 'active' : ''}
+            onClick={() => {
+              setMode('Markers');
+              setSelectedStation(null);
+            }}
+            title="Incident markers view"
+          >
+            <MapPin size={14} />
+            <span>Markers</span>
+          </button>
+          <button
+            type="button"
+            className={mode === 'Tracking' ? 'active' : ''}
+            onClick={() => {
+              setMode('Tracking');
+              setSelectedStation(null);
+            }}
+            title="APRS responder tracking view"
+          >
+            <Radio size={14} />
+            <span>APRS Tracking</span>
+          </button>
+          <button
+            type="button"
+            className={mode === 'Heatmap' ? 'active' : ''}
+            onClick={() => {
+              setMode('Heatmap');
+              setSelectedStation(null);
+            }}
+            title="Incident risk density heatmap"
+          >
+            <Flame size={14} />
+            <span>Heatmap</span>
+          </button>
         </div>
       </div>
 

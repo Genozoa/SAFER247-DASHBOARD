@@ -133,7 +133,24 @@ export default function LeafletMap({
     window.leafletMapInstance = map;
     setIsMapReady(true);
 
+    // Ensure map tiles stretch to all corners and sides on render & resize
+    const resizeObserver = new ResizeObserver(() => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+      }
+    });
+    if (mapContainerRef.current) {
+      resizeObserver.observe(mapContainerRef.current);
+    }
+    const initialTimer = setTimeout(() => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+      }
+    }, 120);
+
     return () => {
+      clearTimeout(initialTimer);
+      resizeObserver.disconnect();
       window.leafletMapInstance = null;
       map.remove();
       mapInstanceRef.current = null;
