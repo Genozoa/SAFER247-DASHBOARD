@@ -301,25 +301,27 @@ export default function MapViewPage() {
           </div>
         )}
 
-        {/* Map Legend */}
-        <div className="legend">
-          <b>Incident Legend</b>
-          <span>♨ Fire</span>
-          <span>≋ Flood</span>
-          <span>▱ Vehicular Accident</span>
-          <span>✚ Medical Emergency</span>
-          <span>⛰ Landslide</span>
-        </div>
+        {/* Map Legend (Markers & Tracking mode) */}
+        {mode !== 'Heatmap' && (
+          <div className="legend">
+            <b>Incident Legend</b>
+            <span>♨ Fire</span>
+            <span>≋ Flood</span>
+            <span>▱ Vehicular Accident</span>
+            <span>✚ Medical Emergency</span>
+            <span>⛰ Landslide</span>
+          </div>
+        )}
 
-        {/* Heatmap Insights Sidebar */}
+        {/* Kernel Density (KDE) Insights Sidebar */}
         {mode === 'Heatmap' && (
           <aside className="heat-insights">
-            <h2>Heatmap Risk Density</h2>
+            <h2>Kernel Density (KDE) Hotspots</h2>
             <b>San Fernando, Bukidnon</b>
             <article>
               <b>Brgy. Little Baguio (Sitio Dayag)</b>
               <p>
-                <strong>12 reports</strong> recorded (high landslide & flood risk corridors)
+                <strong>12 hazard points</strong> (steep slope landslide & flood risk corridors)
               </p>
               <button
                 type="button"
@@ -334,7 +336,7 @@ export default function MapViewPage() {
             <article>
               <b>Brgy. Halapitan (Tigwa River Basin)</b>
               <p>
-                <strong>8 reports</strong> recorded (river water surge & evacuation staging)
+                <strong>8 hazard points</strong> (river surge & central evacuation staging)
               </p>
               <button
                 type="button"
@@ -349,7 +351,7 @@ export default function MapViewPage() {
             <article>
               <b>Brgy. Kalagangan (Sayre Highway)</b>
               <p>
-                <strong>6 reports</strong> recorded (high collision & junction incidents)
+                <strong>6 hazard points</strong> (arterial junction & road slip hazards)
               </p>
               <button
                 type="button"

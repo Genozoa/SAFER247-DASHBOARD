@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import L from 'leaflet';
 import {
   Layers,
@@ -12,7 +12,6 @@ import {
   Compass,
   Check,
   Building2,
-  Tag,
 } from 'lucide-react';
 import {
   SAN_FERNANDO_CENTER,
@@ -26,13 +25,14 @@ import {
   BARANGAY_CENTROIDS,
   SAN_FERNANDO_MAP_BOUNDS,
 } from '../../data/sanFernandoBoundary';
+import { createKdeHeatmapLayer } from './KdeHeatmapLayer';
 
-// Google Maps style tile configurations (authentic Google green and cartography)
+// Google Maps style tile configurations (clean embedded cartography)
 const TILE_LAYERS = {
   default: {
     name: 'Default',
     icon: MapIcon,
-    description: 'Google Maps Roadmap with iconic green vegetation & clean roads',
+    description: 'Google Maps Roadmap with clean roads and natural topography',
     url: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
     options: {
       subdomains: ['0', '1', '2', '3'],
@@ -43,9 +43,8 @@ const TILE_LAYERS = {
   satellite: {
     name: 'Satellite',
     icon: Satellite,
-    description: 'Google Maps High-Res Satellite Imagery with Road & Town Labels',
+    description: 'Google Maps High-Res Satellite Imagery with embedded road & town labels',
     url: 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
-    urlNoLabels: 'https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
     options: {
       subdomains: ['0', '1', '2', '3'],
       maxZoom: 20,
@@ -55,7 +54,7 @@ const TILE_LAYERS = {
   terrain: {
     name: 'Terrain',
     icon: Mountain,
-    description: 'Google Maps Topography & Hillshading with Forest Greenery',
+    description: 'Google Maps Topography & Hillshading with embedded contours',
     url: 'https://mt{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',
     options: {
       subdomains: ['0', '1', '2', '3'],
@@ -80,24 +79,21 @@ export default function LeafletMap({
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const baseTileLayerRef = useRef(null);
-  const overlayTileLayerRef = useRef(null);
 
   // Layer groups for clean management
   const incidentsLayerRef = useRef(null);
   const aprsMarkersLayerRef = useRef(null);
   const aprsTrailsLayerRef = useRef(null);
-  const heatmapLayerRef = useRef(null);
+  const kdeHeatLayerRef = useRef(null);
   const municipalBorderGroupRef = useRef(null);
   const barangaysLayerRef = useRef(null);
-  const barangayLabelsLayerRef = useRef(null);
   const municipalPolygonRef = useRef(null);
 
   // Map settings and feature toggles
   const [mapType, setMapType] = useState('default'); // 'default' | 'satellite' | 'terrain'
-  const [showSatelliteLabels, setShowSatelliteLabels] = useState(true);
   const [showMunicipalBorder, setShowMunicipalBorder] = useState(true);
   const [showBarangayPolygons, setShowBarangayPolygons] = useState(true);
-  const [showBarangayLabels, setShowBarangayLabels] = useState(true);
+  const [kdeRadius, setKdeRadius] = useState(36);
   const [isMapReady, setIsMapReady] = useState(false);
 
   // Initialize Leaflet Map
@@ -112,7 +108,7 @@ export default function LeafletMap({
       maxZoom: 18,
       maxBounds: SAN_FERNANDO_BOUNDS,
       maxBoundsViscosity: 0.9,
-      zoomControl: false, // Custom Google-like zoom buttons
+      zoomControl: false, // Custom zoom buttons
     });
 
     // Add Base Tile Layer
@@ -123,8 +119,6 @@ export default function LeafletMap({
     // Initialize Layer Groups in proper z-order
     municipalBorderGroupRef.current = L.layerGroup().addTo(map);
     barangaysLayerRef.current = L.layerGroup().addTo(map);
-    barangayLabelsLayerRef.current = L.layerGroup().addTo(map);
-    heatmapLayerRef.current = L.layerGroup().addTo(map);
     aprsTrailsLayerRef.current = L.layerGroup().addTo(map);
     incidentsLayerRef.current = L.layerGroup().addTo(map);
     aprsMarkersLayerRef.current = L.layerGroup().addTo(map);
@@ -169,30 +163,13 @@ export default function LeafletMap({
       if (baseTileLayerRef.current) {
         map.removeLayer(baseTileLayerRef.current);
       }
-      if (overlayTileLayerRef.current) {
-        map.removeLayer(overlayTileLayerRef.current);
-        overlayTileLayerRef.current = null;
-      }
 
       const config = TILE_LAYERS[newType];
-      let tileUrl = config.url;
-      if (newType === 'satellite' && !showSatelliteLabels && config.urlNoLabels) {
-        tileUrl = config.urlNoLabels;
-      }
-
-      const newBase = L.tileLayer(tileUrl, config.options).addTo(map);
+      const newBase = L.tileLayer(config.url, config.options).addTo(map);
       baseTileLayerRef.current = newBase;
     },
-    [showSatelliteLabels]
+    []
   );
-
-  // Toggle Satellite Labels (instant update via setUrl)
-  useEffect(() => {
-    if (mapType !== 'satellite' || !baseTileLayerRef.current) return;
-    const config = TILE_LAYERS.satellite;
-    const targetUrl = showSatelliteLabels ? config.url : config.urlNoLabels;
-    baseTileLayerRef.current.setUrl(targetUrl);
-  }, [showSatelliteLabels, mapType]);
 
   // Fit Entire San Fernando Lungsod (enclosing all 24 barangays)
   const fitEntireLungsod = useCallback(() => {
@@ -232,7 +209,7 @@ export default function LeafletMap({
     if (!showMunicipalBorder) return;
 
     // Google Maps Lungsod Border: Red and white alternating dashed outline
-    // 1. Underlay white solid line (provides sharp white contrast against satellite and terrain)
+    // 1. Underlay white solid line (sharp contrast)
     const whiteUnderlay = L.polygon(SAN_FERNANDO_MUNICIPAL_BORDER, {
       color: '#ffffff',
       weight: 5,
@@ -243,7 +220,7 @@ export default function LeafletMap({
     });
     group.addLayer(whiteUnderlay);
 
-    // 2. Overlay red dashed line (standard Google Maps administrative boundary)
+    // 2. Overlay red dashed line (standard administrative boundary)
     const redOverlay = L.polygon(SAN_FERNANDO_MUNICIPAL_BORDER, {
       color: '#ea4335',
       weight: 4,
@@ -264,7 +241,7 @@ export default function LeafletMap({
     municipalPolygonRef.current = redOverlay;
   }, [isMapReady, showMunicipalBorder]);
 
-  // Render 24 Barangay Polygons & Selection Highlights
+  // Render 24 Barangay Polygons & Selection Highlights (without redundant text overlays)
   useEffect(() => {
     if (!isMapReady || !barangaysLayerRef.current) return;
     const layer = barangaysLayerRef.current;
@@ -290,9 +267,9 @@ export default function LeafletMap({
 
       polygon.bindTooltip(
         `<div style="font-size: 11px; line-height: 1.4;">
-          <strong style="color: #38bdf8;">Brgy. ${bgyName}</strong><br/>
-          <span style="color: #94a3b8;">San Fernando, Bukidnon • PSGC: ${feature.properties.psgc}</span><br/>
-          <small style="color: #cbd5e1;">Click to filter incidents in this barangay</small>
+          <strong style="color: #0284c7;">Brgy. ${bgyName}</strong><br/>
+          <span style="color: #64748b;">San Fernando, Bukidnon • PSGC: ${feature.properties.psgc}</span><br/>
+          <small style="color: #0369a1;">Click to inspect incidents</small>
         </div>`,
         { sticky: true, className: 'bgy-tooltip' }
       );
@@ -321,7 +298,8 @@ export default function LeafletMap({
         }
       });
 
-      polygon.on('click', () => {
+      polygon.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
         if (onSelectBarangay) {
           onSelectBarangay(bgyName);
         }
@@ -336,61 +314,7 @@ export default function LeafletMap({
     });
   }, [isMapReady, showBarangayPolygons, selectedBarangay, onSelectBarangay]);
 
-  // Render Google Maps Style Barangay Labels & Regional Markers
-  useEffect(() => {
-    if (!isMapReady || !barangayLabelsLayerRef.current) return;
-    const layer = barangayLabelsLayerRef.current;
-    layer.clearLayers();
-
-    if (!showBarangayLabels) return;
-
-    const labelThemeClass = mapType === 'satellite' ? 'satellite-label' : 'roadmap-label';
-
-    // 1. Render Labels for all 24 Barangays at their geographic centroids
-    Object.entries(BARANGAY_CENTROIDS).forEach(([name, [lat, lng]]) => {
-      const isSelected = selectedBarangay === name;
-      const labelIcon = L.divIcon({
-        className: `google-map-bgy-label ${labelThemeClass}`,
-        html: `<span style="${isSelected ? 'color: #2563eb !important; font-size: 11px; font-weight: 900;' : ''}">${name.toUpperCase()}</span>`,
-        iconSize: [120, 20],
-        iconAnchor: [60, 10],
-      });
-
-      const marker = L.marker([lat, lng], {
-        icon: labelIcon,
-        interactive: true,
-      });
-
-      marker.on('click', () => {
-        if (onSelectBarangay) onSelectBarangay(name);
-      });
-
-      layer.addLayer(marker);
-    });
-
-    // 2. Render Regional Boundary Indicators (as seen on Google Maps San Fernando lungsod)
-    const regionalMarkers = [
-      { text: 'NORTHERN MINDANAO', lat: 7.632, lng: 125.375, rotate: -8 },
-      { text: 'DAVAO REGION', lat: 7.745, lng: 125.440, rotate: -70 },
-      { text: 'NORTHERN MINDANAO', lat: 7.765, lng: 125.418, rotate: -70 },
-    ];
-
-    regionalMarkers.forEach((rm) => {
-      const regIcon = L.divIcon({
-        className: `regional-boundary-label ${labelThemeClass}`,
-        html: `<span style="transform: rotate(${rm.rotate}deg);">${rm.text}</span>`,
-        iconSize: [180, 24],
-        iconAnchor: [90, 12],
-      });
-      const regMarker = L.marker([rm.lat, rm.lng], {
-        icon: regIcon,
-        interactive: false,
-      });
-      layer.addLayer(regMarker);
-    });
-  }, [isMapReady, showBarangayLabels, mapType, selectedBarangay, onSelectBarangay]);
-
-  // Fly to selected Barangay
+  // Fly to selected Barangay: Preserves user's current zoom level so navigating between areas NEVER zooms out!
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !isMapReady) return;
@@ -398,7 +322,10 @@ export default function LeafletMap({
     if (selectedBarangay && selectedBarangay !== 'All Barangays') {
       const coords = BARANGAY_CENTROIDS[selectedBarangay] || BARANGAY_COORDINATES[selectedBarangay];
       if (coords) {
-        map.flyTo(coords, 13, { duration: 0.9 });
+        const currentZoom = map.getZoom();
+        // If already zoomed in (e.g. 13, 14, 15, 16), stay at current zoom level! Never zoom out.
+        const targetZoom = Math.max(currentZoom, 13);
+        map.flyTo(coords, targetZoom, { duration: 0.65 });
       }
     }
   }, [selectedBarangay, isMapReady]);
@@ -407,37 +334,49 @@ export default function LeafletMap({
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !isMapReady || !selectedStation) return;
-    map.flyTo([selectedStation.lat, selectedStation.lng], 15, { duration: 0.8 });
+    const currentZoom = map.getZoom();
+    const targetZoom = Math.max(currentZoom, 14);
+    map.flyTo([selectedStation.lat, selectedStation.lng], targetZoom, { duration: 0.7 });
   }, [selectedStation, isMapReady]);
 
   // Fly to selected Incident
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !isMapReady || !selectedIncident) return;
-    const lat = selectedIncident.lat || 7.838;
-    const lng = selectedIncident.lng || 125.214;
-    map.flyTo([lat, lng], 15, { duration: 0.8 });
+    const lat = selectedIncident.lat;
+    const lng = selectedIncident.lng;
+    if (lat && lng) {
+      const currentZoom = map.getZoom();
+      const targetZoom = Math.max(currentZoom, 14);
+      map.flyTo([lat, lng], targetZoom, { duration: 0.7 });
+    }
   }, [selectedIncident, isMapReady]);
 
-  // Render Incident Markers
+  // Render Incident Markers (clean pins without redundant text badges)
   useEffect(() => {
     if (!isMapReady || !incidentsLayerRef.current) return;
     const layer = incidentsLayerRef.current;
     layer.clearLayers();
 
-    if (mode === 'Markers' || mode === 'Heatmap') {
+    if (mode === 'Markers' || mode === 'Tracking') {
       incidents.forEach((incident) => {
-        const isSelected = selectedIncident?.id === incident.id;
-        const lat = incident.lat || 7.838;
-        const lng = incident.lng || 125.214;
+        const lat = incident.lat;
+        const lng = incident.lng;
+        if (!lat || !lng) return;
 
-        // Visual theme by type
+        const isSelected = selectedIncident?.id === incident.id;
         let color = '#ef4444';
         let bg = '#fee2e2';
-        let symbol = '♨';
-        let iconName = 'fire';
+        let symbol = '●';
+        let iconName = 'generic';
 
         switch (incident.type) {
+          case 'Fire':
+            color = '#ef4444';
+            bg = '#fee2e2';
+            symbol = '♨';
+            iconName = 'fire';
+            break;
           case 'Flood':
             color = '#0284c7';
             bg = '#e0f2fe';
@@ -445,6 +384,7 @@ export default function LeafletMap({
             iconName = 'flood';
             break;
           case 'Vehicular Accident':
+          case 'Accident':
             color = '#f59e0b';
             bg = '#fef3c7';
             symbol = '▱';
@@ -474,12 +414,11 @@ export default function LeafletMap({
               <div class="pin-body" style="background-color: ${color}; color: #ffffff;">
                 <span class="pin-symbol">${symbol}</span>
               </div>
-              <div class="pin-label-tag">${incident.barangay}</div>
             </div>
           `,
-          iconSize: [38, 44],
-          iconAnchor: [19, 40],
-          popupAnchor: [0, -36],
+          iconSize: [36, 42],
+          iconAnchor: [18, 38],
+          popupAnchor: [0, -34],
         });
 
         const marker = L.marker([lat, lng], { icon: customIcon });
@@ -491,7 +430,7 @@ export default function LeafletMap({
             <p style="margin: 0 0 6px; font-size: 11px; color: #64748b;">${incident.text}</p>
             <div style="display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 4px;">
               <span><b>ID:</b> ${incident.id}</span>
-              <span><b>Time:</b> ${incident.time}</span>
+              <span><b>Barangay:</b> ${incident.barangay}</span>
             </div>
           </div>
         `);
@@ -520,64 +459,64 @@ export default function LeafletMap({
         // Render breadcrumb trail
         if (showBreadcrumbs && station.trail && station.trail.length > 1) {
           const polyline = L.polyline(station.trail, {
-            color: isSelected ? '#2563eb' : '#3b82f6',
-            weight: isSelected ? 4 : 3,
-            opacity: isSelected ? 0.9 : 0.65,
-            dashArray: isSelected ? undefined : '5, 8',
+            color: '#0284c7',
+            weight: 3,
+            opacity: 0.75,
+            dashArray: '6, 6',
+            lineCap: 'round',
           });
           trailsLayer.addLayer(polyline);
+
+          station.trail.forEach((point, idx) => {
+            const isLast = idx === station.trail.length - 1;
+            if (!isLast && idx % 2 === 0) {
+              const dot = L.circleMarker(point, {
+                radius: 3,
+                color: '#0284c7',
+                fillColor: '#ffffff',
+                fillOpacity: 0.8,
+                weight: 1.5,
+              });
+              trailsLayer.addLayer(dot);
+            }
+          });
         }
 
-        // APRS Station Icon
-        let iconGlyph = '🚑';
-        if (station.iconType === 'truck') iconGlyph = '🛻';
-        if (station.iconType === 'command') iconGlyph = '📡';
-        if (station.iconType === 'search') iconGlyph = '🥾';
-        if (station.iconType === 'base') iconGlyph = '🏛';
-        if (station.iconType === 'weather') iconGlyph = '⛅';
-
+        // Animated APRS vehicle / responder marker
         const aprsIcon = L.divIcon({
-          className: 'custom-aprs-marker',
+          className: 'aprs-leaflet-marker',
           html: `
-            <div class="aprs-station-pin ${isSelected ? 'selected' : ''} ${station.speed > 0 ? 'moving' : 'fixed'}">
-              <div class="aprs-callsign-tag">${station.callsign}</div>
-              <div class="aprs-pin-core">
-                <span class="aprs-glyph">${iconGlyph}</span>
-                ${
-                  station.speed > 0
-                    ? `<div class="aprs-heading-arrow" style="transform: rotate(${station.heading}deg)">▲</div>`
-                    : ''
-                }
+            <div class="aprs-pin-box ${isSelected ? 'selected' : ''}">
+              <div class="aprs-pulse-ring"></div>
+              <div class="aprs-callsign-badge">${station.callsign}</div>
+              <div class="aprs-vehicle-dot">
+                <span class="aprs-dot-center"></span>
               </div>
-              ${
-                station.speed > 0
-                  ? `<div class="aprs-speed-tag">${station.speed} km/h</div>`
-                  : `<div class="aprs-speed-tag fixed-tag">${station.altitude}m</div>`
-              }
             </div>
           `,
-          iconSize: [48, 54],
-          iconAnchor: [24, 46],
-          popupAnchor: [0, -42],
+          iconSize: [52, 44],
+          iconAnchor: [26, 32],
+          popupAnchor: [0, -32],
         });
 
         const marker = L.marker([station.lat, station.lng], { icon: aprsIcon });
 
         marker.bindPopup(`
-          <div class="map-popup-card aprs-popup">
-            <div class="aprs-popup-head">
-              <span class="aprs-tag">APRS VHF 144.390</span>
-              <strong style="color: #1e293b; font-size: 14px;">${station.callsign}</strong>
+          <div class="aprs-popup-card">
+            <div class="aprs-popup-header">
+              <span class="aprs-call">${station.callsign}</span>
+              <span class="aprs-freq">144.390 MHz</span>
             </div>
             <div style="font-size: 12px; font-weight: 600; color: #334155; margin: 4px 0 2px;">${station.name}</div>
-            <div style="font-size: 11px; color: #64748b; margin-bottom: 6px;">${station.role}</div>
-            <div class="aprs-popup-grid">
-              <div><span>Speed</span><b>${station.speed} km/h</b></div>
-              <div><span>Heading</span><b>${station.heading}°</b></div>
-              <div><span>Altitude</span><b>${station.altitude} m</b></div>
-              <div><span>Battery</span><b>${station.battery}</b></div>
+            <div class="aprs-telemetry-grid">
+              <div><b>Speed:</b> ${station.speed} km/h</div>
+              <div><b>Heading:</b> ${station.heading}°</div>
+              <div><b>Altitude:</b> ${station.altitude} m</div>
+              <div><b>Battery:</b> ${station.battery}%</div>
             </div>
-            <div class="aprs-raw-snippet"><code>${station.rawPacket}</code></div>
+            <div style="font-size: 10px; color: #64748b; margin-top: 4px;">
+              <b>Status:</b> ${station.comment || 'Patrol in progress'}
+            </div>
           </div>
         `);
 
@@ -590,80 +529,86 @@ export default function LeafletMap({
     }
   }, [isMapReady, aprsStations, selectedStation, mode, showBreadcrumbs, onSelectStation]);
 
-  // Render Heatmap Hotspots across northern, central, and southern corridors
+  // Compute continuous Kernel Density Estimation (KDE) data points
+  const kdePoints = useMemo(() => {
+    const points = [];
+
+    // 1. Convert active incidents into weighted KDE density points
+    incidents.forEach((inc) => {
+      let weight = 0.5;
+      if (inc.severity === 'Critical') weight = 1.0;
+      else if (inc.severity === 'High') weight = 0.8;
+      else if (inc.severity === 'Moderate') weight = 0.55;
+      else if (inc.severity === 'Low') weight = 0.35;
+
+      if (inc.casualties && Number(inc.casualties) > 0) {
+        weight = Math.min(1.0, weight + 0.15);
+      }
+      if (inc.type === 'Landslide' || inc.type === 'Flood') {
+        weight = Math.min(1.0, weight + 0.1);
+      }
+
+      if (inc.lat && inc.lng) {
+        points.push([inc.lat, inc.lng, weight]);
+      }
+    });
+
+    // 2. Incorporate documented MDRRMO San Fernando disaster vulnerability hotspots
+    // Little Baguio high landslide slip face and steep slope instability
+    points.push([7.9245, 125.3001, 1.0]);
+    points.push([7.9199, 125.2880, 0.9]);
+    points.push([7.9280, 125.2930, 0.8]);
+
+    // Tigwa Riverbank Flood Inundation basin (Poblacion / Halapitan)
+    points.push([7.9186, 125.3286, 0.95]);
+    points.push([7.9137, 125.3362, 0.9]);
+    points.push([7.9220, 125.3315, 0.85]);
+
+    // Kalagangan southern arterial highway collision & road collapse zone
+    points.push([7.6922, 125.3900, 0.85]);
+    points.push([7.7132, 125.3602, 0.8]);
+
+    // Namnam low river crossing & flash floodway
+    points.push([7.8340, 125.3780, 0.8]);
+
+    // Kibongcog mountain landslide corridor
+    points.push([7.9810, 125.2450, 0.75]);
+
+    // Cabuling river overflow basin
+    points.push([7.6686, 125.3761, 0.7]);
+
+    return points;
+  }, [incidents]);
+
+  // Render Kernel Density Estimation (KDE) Heatmap Layer
   useEffect(() => {
-    if (!isMapReady || !heatmapLayerRef.current) return;
-    const layer = heatmapLayerRef.current;
-    layer.clearLayers();
+    if (!isMapReady) return;
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (kdeHeatLayerRef.current) {
+      map.removeLayer(kdeHeatLayerRef.current);
+      kdeHeatLayerRef.current = null;
+    }
 
     if (mode === 'Heatmap') {
-      // 1. Little Baguio (High Landslide & flash flood risk zone in the northwest)
-      const c1 = L.circle([7.9199, 125.2880], {
-        radius: 1200,
-        color: '#b45309',
-        fillColor: '#ef4444',
-        fillOpacity: 0.35,
-        weight: 1,
+      const kdeLayer = createKdeHeatmapLayer(kdePoints, {
+        radius: kdeRadius,
+        blur: 22,
+        max: 1.0,
+        minOpacity: 0.05,
       });
-      c1.bindTooltip('<b>High Risk Zone</b>: Brgy. Little Baguio (Landslide / Flood Corridors)', {
-        direction: 'top',
-        permanent: false,
-      });
-      layer.addLayer(c1);
-
-      // Inner core
-      const c1Core = L.circle([7.9250, 125.2980], {
-        radius: 600,
-        color: '#b91c1c',
-        fillColor: '#b91c1c',
-        fillOpacity: 0.5,
-        weight: 0,
-      });
-      layer.addLayer(c1Core);
-
-      // 2. Halapitan Tigwa Riverbank (Flood Inundation basin in Poblacion)
-      const c2 = L.circle([7.9137, 125.3362], {
-        radius: 1000,
-        color: '#0284c7',
-        fillColor: '#0284c7',
-        fillOpacity: 0.35,
-        weight: 1,
-      });
-      c2.bindTooltip('<b>Critical Surge Zone</b>: Tigwa Riverbank / Poblacion Evacuation Area', {
-        direction: 'top',
-        permanent: false,
-      });
-      layer.addLayer(c2);
-
-      // 3. Kalagangan Corridor (Accident & response cluster in southern corridor)
-      const c3 = L.circle([7.7132, 125.3602], {
-        radius: 950,
-        color: '#f59e0b',
-        fillColor: '#f59e0b',
-        fillOpacity: 0.3,
-        weight: 1,
-      });
-      c3.bindTooltip('<b>Incident Cluster</b>: Brgy. Kalagangan Southern Highway Corridor', {
-        direction: 'top',
-        permanent: false,
-      });
-      layer.addLayer(c3);
-
-      // 4. Cabuling / Matupe Southern Gateway cluster
-      const c4 = L.circle([7.6686, 125.3761], {
-        radius: 1100,
-        color: '#0284c7',
-        fillColor: '#0284c7',
-        fillOpacity: 0.28,
-        weight: 1,
-      });
-      c4.bindTooltip('<b>Waterway Monitoring</b>: Brgy. Cabuling / Southern Davao Approach', {
-        direction: 'top',
-        permanent: false,
-      });
-      layer.addLayer(c4);
+      kdeLayer.addTo(map);
+      kdeHeatLayerRef.current = kdeLayer;
     }
-  }, [isMapReady, mode]);
+
+    return () => {
+      if (kdeHeatLayerRef.current && map) {
+        map.removeLayer(kdeHeatLayerRef.current);
+        kdeHeatLayerRef.current = null;
+      }
+    };
+  }, [isMapReady, mode, kdePoints, kdeRadius]);
 
   return (
     <div className="leaflet-map-wrapper">
@@ -689,19 +634,7 @@ export default function LeafletMap({
           );
         })}
 
-        {/* Labels checkbox if Satellite is active */}
-        {mapType === 'satellite' && (
-          <label className="satellite-labels-toggle" title="Toggle Road and Town Labels">
-            <input
-              type="checkbox"
-              checked={showSatelliteLabels}
-              onChange={(e) => setShowSatelliteLabels(e.target.checked)}
-            />
-            <span>Labels</span>
-          </label>
-        )}
-
-        {/* San Fernando Lungsod Boundary & Layer Toggles */}
+        {/* San Fernando Lungsod Boundary & 24 Barangay Borders Toggles */}
         <div className="map-layer-toggles">
           <button
             type="button"
@@ -709,7 +642,7 @@ export default function LeafletMap({
             onClick={() => setShowMunicipalBorder((prev) => !prev)}
             title="Toggle Google Maps San Fernando Lungsod Municipal Border"
           >
-            <span style={{ color: showMunicipalBorder ? '#dc2626' : '#94a3b8' }}>●</span>
+            <span style={{ color: showMunicipalBorder ? '#dc2626' : '#94a3b8', fontSize: '11px' }}>●</span>
             <span>Lungsod Border</span>
           </button>
 
@@ -717,23 +650,49 @@ export default function LeafletMap({
             type="button"
             className={`map-layer-toggle-btn ${showBarangayPolygons ? 'bgy-active' : ''}`}
             onClick={() => setShowBarangayPolygons((prev) => !prev)}
-            title="Toggle All 24 Barangay Boundary Polygons"
+            title="Toggle All 24 Barangay Boundary Lines"
           >
             <Building2 size={13} />
             <span>24 Barangays</span>
           </button>
-
-          <button
-            type="button"
-            className={`map-layer-toggle-btn ${showBarangayLabels ? 'bgy-active' : ''}`}
-            onClick={() => setShowBarangayLabels((prev) => !prev)}
-            title="Toggle Barangay Name Labels on Map"
-          >
-            <Tag size={13} />
-            <span>Names</span>
-          </button>
         </div>
       </div>
+
+      {/* Kernel Density Estimation (KDE) Heatmap Floating Controls */}
+      {mode === 'Heatmap' && (
+        <div className="kde-map-overlay-badge">
+          <div className="kde-overlay-header">
+            <span className="kde-pulse-dot" />
+            <strong>Kernel Density Estimation (KDE)</strong>
+            <span className="kde-points-count">{kdePoints.length} Hazard Clusters</span>
+          </div>
+          <div className="kde-gradient-bar-wrapper">
+            <div className="kde-gradient-bar" />
+            <div className="kde-gradient-labels">
+              <span>Low Density</span>
+              <span>Moderate</span>
+              <span>High Risk</span>
+              <span>Critical</span>
+            </div>
+          </div>
+          <div className="kde-bandwidth-control">
+            <span className="kde-bandwidth-label">Kernel Bandwidth:</span>
+            <div className="kde-radius-chips">
+              {[26, 36, 48].map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  className={kdeRadius === r ? 'active' : ''}
+                  onClick={() => setKdeRadius(r)}
+                  title={`Set Gaussian KDE bandwidth radius to ${r}px`}
+                >
+                  {r === 26 ? 'Compact' : r === 36 ? 'Standard' : 'Broad'} ({r}px)
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Floating Navigation Controls (Recenter + Fit Bounds + Zoom) */}
       <div className="google-style-nav-controls">
@@ -777,7 +736,7 @@ export default function LeafletMap({
         </div>
       </div>
 
-      {/* APRS Station & Area Status Banner */}
+      {/* Area Status Banner */}
       <div className="map-area-banner">
         <div className="badge-title">
           <span className="live-dot" />

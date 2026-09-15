@@ -2148,6 +2148,129 @@ select.mini-filter {
     transform: scale(0.96);
 }
 
+/* Kernel Density Estimation (KDE) Heatmap Overlay */
+.kde-heatmap-canvas {
+    pointer-events: none;
+    z-index: 450;
+}
+
+.kde-map-overlay-badge {
+    position: absolute;
+    bottom: 24px;
+    left: 20px;
+    z-index: 800;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(8px);
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 10px 14px;
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.18);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 280px;
+    max-width: 330px;
+}
+
+.kde-overlay-header {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: #0f172a;
+}
+
+.kde-pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ef4444;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25);
+    display: inline-block;
+}
+
+.kde-points-count {
+    margin-left: auto;
+    font-size: 10px;
+    color: #64748b;
+    background: #f1f5f9;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.kde-gradient-bar-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.kde-gradient-bar {
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(
+        to right,
+        rgba(59, 130, 246, 0.7),
+        rgba(6, 182, 212, 0.85),
+        rgba(34, 197, 94, 0.9),
+        rgba(245, 158, 11, 0.95),
+        rgba(239, 68, 68, 1)
+    );
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.kde-gradient-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.kde-bandwidth-control {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-top: 6px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.kde-bandwidth-label {
+    font-size: 10px;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.kde-radius-chips {
+    display: flex;
+    gap: 4px;
+}
+
+.kde-radius-chips button {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 10px;
+    color: #475569;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.15s ease;
+}
+
+.kde-radius-chips button:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.kde-radius-chips button.active {
+    background: #0284c7;
+    border-color: #0284c7;
+    color: #ffffff;
+    font-weight: 700;
+}
+
 /* APRS Telemetry Drawer */
 .aprs-telemetry-drawer {
     position:absolute;
