@@ -15,13 +15,12 @@ import {
 } from 'lucide-react';
 import SelectDropdown from '../../components/common/SelectDropdown';
 import LeafletMap from '../../components/map/LeafletMap';
-import AprsTelemetryDrawer from '../../components/map/AprsTelemetryDrawer';
 import {
   INCIDENT_TYPES,
   BARANGAY_OPTIONS,
   DATE_RANGE_OPTIONS,
   INCIDENTS,
-  APRS_RESPONDERS,
+  LIVE_OFFICERS,
   BARANGAY_COORDINATES,
   isWithinDateRange,
 } from '../../data/mockData';
@@ -40,9 +39,14 @@ export default function MapViewPage() {
   const [selectedBarangay, setSelectedBarangay] = useState('All Barangays');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIncident, setSelectedIncident] = useState(null);
-  const [selectedStation, setSelectedStation] = useState(null);
+  const [selectedOfficer, setSelectedOfficer] = useState(null);
   const [showBreadcrumbs, setShowBreadcrumbs] = useState(true);
-  const [aprsList, setAprsList] = useState(APRS_RESPONDERS);
+  const [isBannerDismissed, setIsBannerDismissed] = useState(false);
+
+  // Reset dismissal state whenever filter criteria change so empty state shows again if new criteria has 0 matches
+  useEffect(() => {
+    setIsBannerDismissed(false);
+  }, [selectedType, selectedDateRange, selectedBarangay, searchQuery]);
 
   // Auto-select incident if passed in search params
   useEffect(() => {
@@ -53,31 +57,6 @@ export default function MapViewPage() {
       }
     }
   }, [incidentIdParam]);
-
-  // Periodic APRS ticker simulation: updates "last heard" counter to simulate real VHF telemetry
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setAprsList((prev) =>
-        prev.map((station) => {
-          const delta = Math.floor(Math.random() * 2) + 1;
-          const nextSec = (station.lastHeardSeconds || 5) + delta;
-          // Every ~45-60s reset beacon packet
-          if (nextSec > 60) {
-            return {
-              ...station,
-              lastHeardSeconds: Math.floor(Math.random() * 5) + 1,
-            };
-          }
-          return {
-            ...station,
-            lastHeardSeconds: nextSec,
-          };
-        })
-      );
-    }, 3000);
-
-    return () => clearInterval(timer);
-  }, []);
 
   // Filter incidents based on active criteria
   const filteredIncidents = INCIDENTS.filter((item) => {
@@ -112,11 +91,11 @@ export default function MapViewPage() {
 
   const handleSelectIncident = useCallback((incident) => {
     setSelectedIncident(incident);
-    setSelectedStation(null);
+    setSelectedOfficer(null);
   }, []);
 
-  const handleSelectStation = useCallback((station) => {
-    setSelectedStation(station);
+  const handleSelectOfficer = useCallback((officer) => {
+    setSelectedOfficer(officer);
     setSelectedIncident(null);
   }, []);
 
@@ -131,12 +110,12 @@ export default function MapViewPage() {
       {/* Filters & Mode Tabs Bar */}
       <div className="filter-row map-filter-toolbar">
         <label className="filter-label search-field">
-          <span>Search Incident / Call</span>
+          <span>Search Incident</span>
           <div className="search-input-box">
             <Search size={14} className="search-icon" />
             <input
               type="text"
-              placeholder="Search incidents or callsigns..."
+              placeholder="Search incidents or keywords..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -201,7 +180,7 @@ export default function MapViewPage() {
             className={mode === 'Markers' ? 'active' : ''}
             onClick={() => {
               setMode('Markers');
-              setSelectedStation(null);
+              setSelectedOfficer(null);
             }}
             title="Incident markers view"
           >
@@ -213,19 +192,19 @@ export default function MapViewPage() {
             className={mode === 'Tracking' ? 'active' : ''}
             onClick={() => {
               setMode('Tracking');
-              setSelectedStation(null);
+              setSelectedOfficer(null);
             }}
-            title="APRS responder tracking view"
+            title="DRRMO officer live location tracking"
           >
-            <Radio size={14} />
-            <span>APRS Tracking</span>
+            <Navigation size={14} />
+            <span>Officer Tracking</span>
           </button>
           <button
             type="button"
             className={mode === 'Heatmap' ? 'active' : ''}
             onClick={() => {
               setMode('Heatmap');
-              setSelectedStation(null);
+              setSelectedOfficer(null);
             }}
             title="Incident risk density heatmap"
           >
@@ -235,60 +214,90 @@ export default function MapViewPage() {
         </div>
       </div>
 
-      {/* APRS Quick Status Bar for Tracking Mode */}
-      {mode === 'Tracking' && (
-        <div className="aprs-top-bar">
-          <div className="aprs-bar-title">
-            <Radio size={16} className="radio-pulse-icon" />
-            <span>VHF APRS 144.390 MHz Live Telemetry</span>
-            <small>({aprsList.length} Units Active)</small>
-          </div>
-          <div className="aprs-station-chips">
-            {aprsList.map((st) => {
-              const isSelected = selectedStation?.callsign === st.callsign;
-              return (
-                <button
-                  key={st.callsign}
-                  type="button"
-                  className={`aprs-chip ${isSelected ? 'active' : ''}`}
-                  onClick={() => handleSelectStation(st)}
-                >
-                  <span className="chip-dot" />
-                  <strong>{st.callsign}</strong>
-                  <small>{st.speed > 0 ? `${st.speed} km/h` : 'Fixed'}</small>
-                </button>
-              );
-            })}
-          </div>
-          <label className="breadcrumbs-toggle">
-            <input
-              type="checkbox"
-              checked={showBreadcrumbs}
-              onChange={(e) => setShowBreadcrumbs(e.target.checked)}
-            />
-            <span>Breadcrumbs</span>
-          </label>
-        </div>
-      )}
-
       {/* Real Open-Source Leaflet Map Container */}
       <div className="map-canvas leaflet-wrapper-container">
         <LeafletMap
           mode={mode}
           incidents={filteredIncidents}
-          aprsStations={aprsList}
+          officers={LIVE_OFFICERS}
           selectedIncident={selectedIncident}
-          selectedStation={selectedStation}
+          selectedOfficer={selectedOfficer}
           selectedBarangay={selectedBarangay}
           onSelectIncident={handleSelectIncident}
-          onSelectStation={handleSelectStation}
+          onSelectOfficer={handleSelectOfficer}
           onSelectBarangay={setSelectedBarangay}
           showBreadcrumbs={showBreadcrumbs}
         />
 
+        {/* Officer Tracking "Not Available Yet" State Banner */}
+        {mode === 'Tracking' && (
+          <div className="tracking-unavailable-card" role="status" aria-live="polite">
+            <div className="tracking-unavailable-icon">
+              <Navigation size={20} />
+            </div>
+            <div className="tracking-unavailable-content">
+              <div className="tracking-unavailable-badge-row">
+                <span className="tracking-status-badge">
+                  Under Active Development
+                </span>
+                <span className="tracking-scope-badge">DRRMO Companion Mobile App</span>
+              </div>
+              <h4>Officer Live Tracking Integration Not Available Yet</h4>
+              <p>
+                Live GPS location tracking is reserved for authenticated DRRMO field officers using the companion mobile app currently being developed by another team member. Once released, authorized field officers' real-time coordinates, breadcrumbs, and dispatch statuses will stream directly to this map.
+              </p>
+              <div className="tracking-features-list">
+                <div className="tracking-feature-item">
+                  <span className="tracking-feature-bullet" />
+                  <span>Authenticated DRRMO Officer GPS</span>
+                </div>
+                <div className="tracking-feature-item">
+                  <span className="tracking-feature-bullet" />
+                  <span>Secure Municipal Dispatch Telemetry</span>
+                </div>
+                <div className="tracking-feature-item">
+                  <span className="tracking-feature-bullet" />
+                  <span>Real-time On-Scene Patrol Breadcrumbs</span>
+                </div>
+                <div className="tracking-feature-item">
+                  <span className="tracking-feature-bullet" />
+                  <span>Zero Simulated or Fabricated Signals</span>
+                </div>
+              </div>
+              <div className="tracking-unavailable-actions">
+                <button
+                  type="button"
+                  className="tracking-switch-btn"
+                  onClick={() => setMode('Markers')}
+                >
+                  <MapPin size={13} />
+                  <span>Switch to Incident Markers</span>
+                </button>
+                <button
+                  type="button"
+                  className="tracking-switch-btn secondary"
+                  onClick={() => setMode('Heatmap')}
+                >
+                  <Flame size={13} />
+                  <span>View Risk Heatmap</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Empty State Banner */}
-        {filteredIncidents.length === 0 && mode === 'Markers' && (
-          <div className="map-empty-state">
+        {filteredIncidents.length === 0 && mode === 'Markers' && !isBannerDismissed && (
+          <div className="map-empty-state" role="status" aria-live="polite">
+            <button
+              type="button"
+              className="map-empty-state-close-btn"
+              onClick={() => setIsBannerDismissed(true)}
+              aria-label="Dismiss no results message"
+              title="Dismiss no results message"
+            >
+              <X size={16} />
+            </button>
             <p>No incidents match the selected criteria.</p>
             <span>
               Type: <b>{selectedType}</b> • Range: <b>{selectedDateRange}</b> • Location:{' '}
@@ -412,19 +421,6 @@ export default function MapViewPage() {
               <span>View in Reports Table</span>
             </button>
           </div>
-        )}
-
-        {/* APRS Station Telemetry Drawer */}
-        {selectedStation && (
-          <AprsTelemetryDrawer
-            station={selectedStation}
-            onClose={() => setSelectedStation(null)}
-            onFocusStation={(station) => {
-              if (window.leafletMapInstance) {
-                window.leafletMapInstance.flyTo([station.lat, station.lng], 15);
-              }
-            }}
-          />
         )}
       </div>
     </div>

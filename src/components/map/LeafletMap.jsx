@@ -67,12 +67,12 @@ const TILE_LAYERS = {
 export default function LeafletMap({
   mode = 'Markers',
   incidents = [],
-  aprsStations = [],
+  officers = [],
   selectedIncident = null,
-  selectedStation = null,
+  selectedOfficer = null,
   selectedBarangay = 'All Barangays',
   onSelectIncident,
-  onSelectStation,
+  onSelectOfficer,
   onSelectBarangay,
   showBreadcrumbs = true,
 }) {
@@ -82,8 +82,8 @@ export default function LeafletMap({
 
   // Layer groups for clean management
   const incidentsLayerRef = useRef(null);
-  const aprsMarkersLayerRef = useRef(null);
-  const aprsTrailsLayerRef = useRef(null);
+  const officersMarkersLayerRef = useRef(null);
+  const officersTrailsLayerRef = useRef(null);
   const kdeHeatLayerRef = useRef(null);
   const municipalBorderGroupRef = useRef(null);
   const barangaysLayerRef = useRef(null);
@@ -95,19 +95,53 @@ export default function LeafletMap({
   const [showBarangayPolygons, setShowBarangayPolygons] = useState(true);
   const [kdeRadius, setKdeRadius] = useState(36);
   const [isMapReady, setIsMapReady] = useState(false);
+  const [currentZoom, setCurrentZoom] = useState(11);
+  const [allowedMinZoom, setAllowedMinZoom] = useState(10);
+
+  // Exact Bounding Box of SAN_FERNANDO_MUNICIPAL_BORDER
+  const municipalBorderBounds = useMemo(() => {
+    return L.latLngBounds(SAN_FERNANDO_MUNICIPAL_BORDER);
+  }, []);
+
+  // Dynamically calculate and enforce minZoom so the maximum zoom-out is the closest view
+  // that still shows the entire San Fernando municipal border with 12–20px (target: 16px) padding.
+  const updateDynamicMinZoom = useCallback((map) => {
+    if (!map) return;
+    const container = map.getContainer();
+    if (!container || container.clientWidth === 0 || container.clientHeight === 0) return;
+
+    // Use SAN_FERNANDO_MUNICIPAL_BORDER bounds directly (not the larger buffer)
+    const bounds = L.latLngBounds(SAN_FERNANDO_MUNICIPAL_BORDER);
+    // 16px padding gives 12-20px space between the border bounding box and map edges
+    const fittedZoom = map.getBoundsZoom(bounds, false, [16, 16]);
+
+    if (Number.isFinite(fittedZoom) && fittedZoom > 0) {
+      map.setMinZoom(fittedZoom);
+      setAllowedMinZoom(fittedZoom);
+
+      // If current zoom is less than minZoom (e.g., after resize), fit to bounds
+      if (map.getZoom() < fittedZoom) {
+        map.fitBounds(bounds, { padding: [16, 16], animate: false });
+      }
+    }
+  }, []);
 
   // Initialize Leaflet Map
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
+    // Compute initial center and bounds from SAN_FERNANDO_MUNICIPAL_BORDER
+    const borderBounds = L.latLngBounds(SAN_FERNANDO_MUNICIPAL_BORDER);
+    const borderCenter = borderBounds.getCenter();
+
     // Create Map instance centered on San Fernando, Bukidnon (encompassing all 24 barangays)
     const map = L.map(mapContainerRef.current, {
-      center: SAN_FERNANDO_CENTER,
+      center: borderCenter,
       zoom: 11,
-      minZoom: 9,
+      minZoom: 9, // Will be dynamically refined based on container size and SAN_FERNANDO_MUNICIPAL_BORDER
       maxZoom: 18,
-      maxBounds: SAN_FERNANDO_BOUNDS,
-      maxBoundsViscosity: 0.9,
+      maxBounds: borderBounds.pad(0.35), // Bound panning around San Fernando municipal territory
+      maxBoundsViscosity: 0.85,
       zoomControl: false, // Custom zoom buttons
     });
 
@@ -119,18 +153,30 @@ export default function LeafletMap({
     // Initialize Layer Groups in proper z-order
     municipalBorderGroupRef.current = L.layerGroup().addTo(map);
     barangaysLayerRef.current = L.layerGroup().addTo(map);
-    aprsTrailsLayerRef.current = L.layerGroup().addTo(map);
+    officersTrailsLayerRef.current = L.layerGroup().addTo(map);
     incidentsLayerRef.current = L.layerGroup().addTo(map);
-    aprsMarkersLayerRef.current = L.layerGroup().addTo(map);
+    officersMarkersLayerRef.current = L.layerGroup().addTo(map);
 
     mapInstanceRef.current = map;
     window.leafletMapInstance = map;
+
+    // Initial calculation of dynamic min zoom and fit
+    updateDynamicMinZoom(map);
+    map.fitBounds(borderBounds, { padding: [16, 16], animate: false });
+    setCurrentZoom(map.getZoom());
     setIsMapReady(true);
 
-    // Ensure map tiles stretch to all corners and sides on render & resize
+    // Track zoom level changes for UI controls state
+    const handleZoomEnd = () => {
+      setCurrentZoom(map.getZoom());
+    };
+    map.on('zoomend', handleZoomEnd);
+
+    // Recalculate dynamic minimum zoom when the map container resizes
     const resizeObserver = new ResizeObserver(() => {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.invalidateSize();
+        updateDynamicMinZoom(mapInstanceRef.current);
       }
     });
     if (mapContainerRef.current) {
@@ -139,17 +185,19 @@ export default function LeafletMap({
     const initialTimer = setTimeout(() => {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.invalidateSize();
+        updateDynamicMinZoom(mapInstanceRef.current);
       }
     }, 120);
 
     return () => {
       clearTimeout(initialTimer);
       resizeObserver.disconnect();
+      map.off('zoomend', handleZoomEnd);
       window.leafletMapInstance = null;
       map.remove();
       mapInstanceRef.current = null;
     };
-  }, []);
+  }, [updateDynamicMinZoom]);
 
   // Switch Base Tile Layer (Default, Satellite, Terrain)
   const switchMapType = useCallback(
@@ -172,17 +220,16 @@ export default function LeafletMap({
   );
 
   // Fit Entire San Fernando Lungsod (enclosing all 24 barangays)
+  // Closest view with 12–20px space between the municipal border bounding box and map edges
   const fitEntireLungsod = useCallback(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
-    if (municipalPolygonRef.current) {
-      map.fitBounds(municipalPolygonRef.current.getBounds(), {
-        padding: [24, 24],
-        maxZoom: 12,
-      });
-    } else {
-      map.fitBounds(SAN_FERNANDO_MAP_BOUNDS, { padding: [24, 24] });
-    }
+    const bounds = L.latLngBounds(SAN_FERNANDO_MUNICIPAL_BORDER);
+    map.fitBounds(bounds, {
+      padding: [16, 16],
+      animate: true,
+      duration: 0.6,
+    });
   }, []);
 
   // Recenter to Halapitan Poblacion (Municipal Hall / EOC)
@@ -253,8 +300,19 @@ export default function LeafletMap({
       const bgyName = feature.properties.name;
       const isSelected = selectedBarangay === bgyName;
 
-      // In GeoJSON polygon coordinates are [lng, lat]; Leaflet expects [lat, lng]
-      const latLngs = feature.geometry.coordinates[0].map(([lng, lat]) => [lat, lng]);
+      // In GeoJSON coordinates are [lng, lat]; convert correctly to Leaflet [lat, lng] format
+      // Support standard Polygon as well as MultiPolygon geometries without distortion
+      let latLngs;
+      if (feature.geometry.type === 'MultiPolygon') {
+        latLngs = feature.geometry.coordinates.map((poly) =>
+          poly.map((ring) => ring.map(([lng, lat]) => [lat, lng]))
+        );
+      } else {
+        // Standard Polygon
+        latLngs = feature.geometry.coordinates.map((ring) =>
+          ring.map(([lng, lat]) => [lat, lng])
+        );
+      }
 
       const polygon = L.polygon(latLngs, {
         color: isSelected ? '#1d4ed8' : '#64748b',
@@ -330,14 +388,16 @@ export default function LeafletMap({
     }
   }, [selectedBarangay, isMapReady]);
 
-  // Fly to selected Station (APRS)
+  // Fly to selected Officer
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map || !isMapReady || !selectedStation) return;
+    if (!map || !isMapReady || !selectedOfficer) return;
     const currentZoom = map.getZoom();
     const targetZoom = Math.max(currentZoom, 14);
-    map.flyTo([selectedStation.lat, selectedStation.lng], targetZoom, { duration: 0.7 });
-  }, [selectedStation, isMapReady]);
+    if (selectedOfficer.lat && selectedOfficer.lng) {
+      map.flyTo([selectedOfficer.lat, selectedOfficer.lng], targetZoom, { duration: 0.7 });
+    }
+  }, [selectedOfficer, isMapReady]);
 
   // Fly to selected Incident
   useEffect(() => {
@@ -444,21 +504,22 @@ export default function LeafletMap({
     }
   }, [isMapReady, incidents, selectedIncident, mode, onSelectIncident]);
 
-  // Render APRS Responders and Breadcrumb Trails
+  // Render Live Authorized Officers (when supplied by the companion app integration)
   useEffect(() => {
-    if (!isMapReady || !aprsMarkersLayerRef.current || !aprsTrailsLayerRef.current) return;
-    const markersLayer = aprsMarkersLayerRef.current;
-    const trailsLayer = aprsTrailsLayerRef.current;
+    if (!isMapReady || !officersMarkersLayerRef.current || !officersTrailsLayerRef.current) return;
+    const markersLayer = officersMarkersLayerRef.current;
+    const trailsLayer = officersTrailsLayerRef.current;
     markersLayer.clearLayers();
     trailsLayer.clearLayers();
 
-    if (mode === 'Tracking' || mode === 'Markers') {
-      aprsStations.forEach((station) => {
-        const isSelected = selectedStation?.callsign === station.callsign;
+    if (mode === 'Tracking') {
+      officers.forEach((officer) => {
+        if (!officer.lat || !officer.lng) return;
+        const isSelected = selectedOfficer?.id === officer.id;
 
-        // Render breadcrumb trail
-        if (showBreadcrumbs && station.trail && station.trail.length > 1) {
-          const polyline = L.polyline(station.trail, {
+        // Render breadcrumb trail if provided
+        if (showBreadcrumbs && officer.trail && officer.trail.length > 1) {
+          const polyline = L.polyline(officer.trail, {
             color: '#0284c7',
             weight: 3,
             opacity: 0.75,
@@ -466,32 +527,16 @@ export default function LeafletMap({
             lineCap: 'round',
           });
           trailsLayer.addLayer(polyline);
-
-          station.trail.forEach((point, idx) => {
-            const isLast = idx === station.trail.length - 1;
-            if (!isLast && idx % 2 === 0) {
-              const dot = L.circleMarker(point, {
-                radius: 3,
-                color: '#0284c7',
-                fillColor: '#ffffff',
-                fillOpacity: 0.8,
-                weight: 1.5,
-              });
-              trailsLayer.addLayer(dot);
-            }
-          });
         }
 
-        // Animated APRS vehicle / responder marker
-        const aprsIcon = L.divIcon({
-          className: 'aprs-leaflet-marker',
+        // Live DRRMO Officer Pin
+        const officerIcon = L.divIcon({
+          className: 'officer-leaflet-marker',
           html: `
-            <div class="aprs-pin-box ${isSelected ? 'selected' : ''}">
-              <div class="aprs-pulse-ring"></div>
-              <div class="aprs-callsign-badge">${station.callsign}</div>
-              <div class="aprs-vehicle-dot">
-                <span class="aprs-dot-center"></span>
-              </div>
+            <div class="officer-pin-box ${isSelected ? 'selected' : ''}">
+              <div class="officer-pulse-ring"></div>
+              <div class="officer-badge">${officer.name || 'DRRMO Officer'}</div>
+              <div class="officer-dot"><span class="officer-dot-center"></span></div>
             </div>
           `,
           iconSize: [52, 44],
@@ -499,35 +544,22 @@ export default function LeafletMap({
           popupAnchor: [0, -32],
         });
 
-        const marker = L.marker([station.lat, station.lng], { icon: aprsIcon });
-
+        const marker = L.marker([officer.lat, officer.lng], { icon: officerIcon });
         marker.bindPopup(`
-          <div class="aprs-popup-card">
-            <div class="aprs-popup-header">
-              <span class="aprs-call">${station.callsign}</span>
-              <span class="aprs-freq">144.390 MHz</span>
-            </div>
-            <div style="font-size: 12px; font-weight: 600; color: #334155; margin: 4px 0 2px;">${station.name}</div>
-            <div class="aprs-telemetry-grid">
-              <div><b>Speed:</b> ${station.speed} km/h</div>
-              <div><b>Heading:</b> ${station.heading}°</div>
-              <div><b>Altitude:</b> ${station.altitude} m</div>
-              <div><b>Battery:</b> ${station.battery}%</div>
-            </div>
-            <div style="font-size: 10px; color: #64748b; margin-top: 4px;">
-              <b>Status:</b> ${station.comment || 'Patrol in progress'}
-            </div>
+          <div style="padding: 10px; font-size: 12px; line-height: 1.4;">
+            <strong style="color: #0284c7;">${officer.name || 'DRRMO Officer'}</strong><br/>
+            <span style="color: #64748b;">${officer.unit || 'Field Responder'} • ${officer.barangay || 'San Fernando'}</span>
           </div>
         `);
 
         marker.on('click', () => {
-          if (onSelectStation) onSelectStation(station);
+          if (onSelectOfficer) onSelectOfficer(officer);
         });
 
         markersLayer.addLayer(marker);
       });
     }
-  }, [isMapReady, aprsStations, selectedStation, mode, showBreadcrumbs, onSelectStation]);
+  }, [isMapReady, officers, selectedOfficer, mode, showBreadcrumbs, onSelectOfficer]);
 
   // Compute continuous Kernel Density Estimation (KDE) data points
   const kdePoints = useMemo(() => {
@@ -721,15 +753,17 @@ export default function LeafletMap({
             title="Zoom In"
             aria-label="Zoom In"
             onClick={handleZoomIn}
+            disabled={currentZoom >= 18}
           >
             +
           </button>
           <button
             type="button"
             className="nav-control-btn"
-            title="Zoom Out"
+            title={currentZoom <= allowedMinZoom ? "Minimum zoom reached (San Fernando Municipal Border)" : "Zoom Out"}
             aria-label="Zoom Out"
             onClick={handleZoomOut}
+            disabled={currentZoom <= allowedMinZoom}
           >
             −
           </button>
@@ -745,9 +779,13 @@ export default function LeafletMap({
         <div className="badge-details">
           <span><b>24 Barangays</b></span>
           <span>•</span>
-          <span>APRS: <b>144.390 MHz</b></span>
-          <span>•</span>
-          <span>{aprsStations.length} Responders</span>
+          <span>DRRMO Operations Center</span>
+          {officers.length > 0 && (
+            <>
+              <span>•</span>
+              <span>{officers.length} Live Officers</span>
+            </>
+          )}
         </div>
       </div>
     </div>
