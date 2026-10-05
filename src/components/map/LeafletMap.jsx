@@ -12,6 +12,7 @@ import {
   Compass,
   Check,
   Building2,
+  WifiOff,
 } from 'lucide-react';
 import {
   SAN_FERNANDO_CENTER,
@@ -38,6 +39,7 @@ const TILE_LAYERS = {
       subdomains: ['0', '1', '2', '3'],
       maxZoom: 20,
       attribution: '&copy; Google Maps',
+      errorTileUrl: 'data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"/>',
     },
   },
   satellite: {
@@ -49,6 +51,7 @@ const TILE_LAYERS = {
       subdomains: ['0', '1', '2', '3'],
       maxZoom: 20,
       attribution: '&copy; Google Maps Imagery',
+      errorTileUrl: 'data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"/>',
     },
   },
   terrain: {
@@ -60,6 +63,7 @@ const TILE_LAYERS = {
       subdomains: ['0', '1', '2', '3'],
       maxZoom: 20,
       attribution: '&copy; Google Maps Terrain',
+      errorTileUrl: 'data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"/>',
     },
   },
 };
@@ -97,6 +101,69 @@ export default function LeafletMap({
   const [isMapReady, setIsMapReady] = useState(false);
   const [currentZoom, setCurrentZoom] = useState(11);
   const [allowedMinZoom, setAllowedMinZoom] = useState(10);
+
+  // Offline fallback & tile error detection state
+  const [isOfflineFallback, setIsOfflineFallback] = useState(
+    typeof navigator !== 'undefined' ? !navigator.onLine : false
+  );
+  const [offlineNoticeDismissed, setOfflineNoticeDismissed] = useState(false);
+  const failedTilesCountRef = useRef(0);
+
+  // Listen to network status for immediate online recovery or offline fallback
+  useEffect(() => {
+    const handleOnline = () => {
+      failedTilesCountRef.current = 0;
+      setIsOfflineFallback(false);
+      setOfflineNoticeDismissed(false);
+      if (baseTileLayerRef.current) {
+        baseTileLayerRef.current.redraw();
+      }
+    };
+
+    const handleOffline = () => {
+      setIsOfflineFallback(true);
+      setOfflineNoticeDismissed(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Safe Tile Layer Factory with error detection & offline fallback
+  const createBaseTileLayer = useCallback((type, map) => {
+    if (!map) return null;
+    const config = TILE_LAYERS[type] || TILE_LAYERS.default;
+    const tileOptions = {
+      ...config.options,
+      errorTileUrl:
+        'data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"/>',
+    };
+    const layer = L.tileLayer(config.url, tileOptions);
+
+    layer.on('tileerror', () => {
+      failedTilesCountRef.current += 1;
+      if (failedTilesCountRef.current >= 3 || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+        setIsOfflineFallback(true);
+      }
+    });
+
+    layer.on('tileload', () => {
+      if (failedTilesCountRef.current > 0) {
+        failedTilesCountRef.current = 0;
+      }
+      if (typeof navigator !== 'undefined' && navigator.onLine) {
+        setIsOfflineFallback(false);
+      }
+    });
+
+    layer.addTo(map);
+    return layer;
+  }, []);
 
   // Exact Bounding Box of SAN_FERNANDO_MUNICIPAL_BORDER
   const municipalBorderBounds = useMemo(() => {
@@ -145,9 +212,8 @@ export default function LeafletMap({
       zoomControl: false, // Custom zoom buttons
     });
 
-    // Add Base Tile Layer
-    const baseConfig = TILE_LAYERS.default;
-    const baseLayer = L.tileLayer(baseConfig.url, baseConfig.options).addTo(map);
+    // Add Base Tile Layer with offline detection
+    const baseLayer = createBaseTileLayer('default', map);
     baseTileLayerRef.current = baseLayer;
 
     // Initialize Layer Groups in proper z-order
@@ -197,7 +263,7 @@ export default function LeafletMap({
       map.remove();
       mapInstanceRef.current = null;
     };
-  }, [updateDynamicMinZoom]);
+  }, [updateDynamicMinZoom, createBaseTileLayer]);
 
   // Switch Base Tile Layer (Default, Satellite, Terrain)
   const switchMapType = useCallback(
@@ -210,13 +276,14 @@ export default function LeafletMap({
       // Remove existing base layer
       if (baseTileLayerRef.current) {
         map.removeLayer(baseTileLayerRef.current);
+        baseTileLayerRef.current = null;
       }
 
-      const config = TILE_LAYERS[newType];
-      const newBase = L.tileLayer(config.url, config.options).addTo(map);
+      failedTilesCountRef.current = 0;
+      const newBase = createBaseTileLayer(newType, map);
       baseTileLayerRef.current = newBase;
     },
-    []
+    [createBaseTileLayer]
   );
 
   // Fit Entire San Fernando Lungsod (enclosing all 24 barangays)
@@ -257,12 +324,13 @@ export default function LeafletMap({
 
     // Google Maps Lungsod Border: Red and white alternating dashed outline
     // 1. Underlay white solid line (sharp contrast)
+    // When offline, fill the municipal landmass with a clear fallback background
     const whiteUnderlay = L.polygon(SAN_FERNANDO_MUNICIPAL_BORDER, {
       color: '#ffffff',
       weight: 5,
       opacity: 0.95,
-      fillColor: '#ea4335',
-      fillOpacity: 0.035,
+      fillColor: isOfflineFallback ? '#ffffff' : '#ea4335',
+      fillOpacity: isOfflineFallback ? 0.92 : 0.035,
       interactive: false,
     });
     group.addLayer(whiteUnderlay);
@@ -286,7 +354,7 @@ export default function LeafletMap({
     group.addLayer(redOverlay);
 
     municipalPolygonRef.current = redOverlay;
-  }, [isMapReady, showMunicipalBorder]);
+  }, [isMapReady, showMunicipalBorder, isOfflineFallback]);
 
   // Render 24 Barangay Polygons & Selection Highlights (without redundant text overlays)
   useEffect(() => {
@@ -644,8 +712,89 @@ export default function LeafletMap({
 
   return (
     <div className="leaflet-map-wrapper">
-      {/* Real Open-Source Leaflet Container */}
-      <div ref={mapContainerRef} className="leaflet-map-canvas" />
+      {/* Real Open-Source Leaflet Container with Offline Fallback Background */}
+      <div
+        ref={mapContainerRef}
+        className={`leaflet-map-canvas ${isOfflineFallback ? 'offline-fallback-active' : ''}`}
+        style={
+          isOfflineFallback
+            ? {
+                backgroundColor: '#f1f5f9',
+                backgroundImage:
+                  'linear-gradient(to right, rgba(203, 213, 225, 0.45) 1px, transparent 1px), linear-gradient(to bottom, rgba(203, 213, 225, 0.45) 1px, transparent 1px)',
+                backgroundSize: '40px 40px',
+              }
+            : undefined
+        }
+      />
+
+      {/* Offline Basemap Notice */}
+      {isOfflineFallback && !offlineNoticeDismissed && (
+        <div
+          className="offline-map-fallback-banner"
+          style={{
+            position: 'absolute',
+            bottom: '72px',
+            left: '18px',
+            zIndex: 910,
+            background: 'rgba(255, 255, 255, 0.98)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid #cbd5e1',
+            borderLeft: '4px solid #f59e0b',
+            borderRadius: '8px',
+            padding: '10px 14px',
+            boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
+            maxWidth: '380px',
+            fontSize: '12px',
+            color: '#334155',
+            lineHeight: 1.45,
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '4px',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontWeight: 700,
+                color: '#0f172a',
+                fontSize: '12px',
+              }}
+            >
+              <WifiOff size={14} style={{ color: '#d97706' }} />
+              <span>Offline Mode — Vector Boundaries Active</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setOfflineNoticeDismissed(true)}
+              style={{
+                border: 0,
+                background: 'transparent',
+                color: '#94a3b8',
+                cursor: 'pointer',
+                fontSize: '16px',
+                lineHeight: 1,
+                padding: '0 2px',
+              }}
+              title="Dismiss notice"
+            >
+              ×
+            </button>
+          </div>
+          <div style={{ color: '#64748b', fontSize: '11px' }}>
+            Online base tiles are currently unreachable. The map is operating with locally bundled San
+            Fernando municipal boundaries, 24 barangays, and emergency data. Real offline map imagery
+            requires locally cached map tiles.
+          </div>
+        </div>
+      )}
 
       {/* Google Maps Style Layer Switcher & Feature Toggles Bar */}
       <div className="google-style-map-type-bar" role="group" aria-label="Map Type & Overlays">

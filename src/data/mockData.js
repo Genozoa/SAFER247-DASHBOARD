@@ -61,6 +61,7 @@ export const BARANGAY_COORDINATES = {
 };
 
 export const BARANGAY_OPTIONS = ['All Barangays', ...SAN_FERNANDO_BARANGAYS];
+export const REPORT_BARANGAY_OPTIONS = ['All 24 barangays', ...SAN_FERNANDO_BARANGAYS];
 
 export const DATE_RANGE_OPTIONS = [
   'Today',
@@ -71,8 +72,23 @@ export const DATE_RANGE_OPTIONS = [
   'All Time',
 ];
 
+export const REPORT_DATE_RANGE_OPTIONS = [
+  'Today',
+  'Last 7 days',
+  'Last 30 days',
+];
+
 export const INCIDENT_TYPES = [
   'All Types',
+  'Fire',
+  'Flood',
+  'Vehicular Accident',
+  'Medical',
+  'Landslide',
+];
+
+export const REPORT_TYPE_OPTIONS = [
+  'All types',
   'Fire',
   'Flood',
   'Vehicular Accident',
@@ -317,11 +333,12 @@ export function isWithinDateRange(incidentDateStr, range) {
   const incStart = new Date(incDate.getFullYear(), incDate.getMonth(), incDate.getDate()).getTime();
   const diffDays = Math.round((todayStart - incStart) / (1000 * 60 * 60 * 24));
 
-  if (range === 'Today') return diffDays === 0;
-  if (range === 'Yesterday') return diffDays === 1;
-  if (range === 'Last 7 Days') return diffDays >= 0 && diffDays <= 7;
-  if (range === 'Last 30 Days') return diffDays >= 0 && diffDays <= 30;
-  if (range === 'This Month') {
+  const normalized = range.toLowerCase().trim();
+  if (normalized === 'today') return diffDays === 0;
+  if (normalized === 'yesterday') return diffDays === 1;
+  if (normalized === 'last 7 days') return diffDays >= 0 && diffDays <= 7;
+  if (normalized === 'last 30 days') return diffDays >= 0 && diffDays <= 30;
+  if (normalized === 'this month') {
     return incDate.getFullYear() === now.getFullYear() && incDate.getMonth() === now.getMonth();
   }
   return true;

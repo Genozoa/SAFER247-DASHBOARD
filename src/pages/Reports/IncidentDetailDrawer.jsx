@@ -30,7 +30,11 @@ export default function IncidentDetailDrawer({ item, onClose }) {
           <dd>{item.sender}</dd>
 
           <dt>Date & Time</dt>
-          <dd>May 3, 2026, {item.time}</dd>
+          <dd>
+            {item.date
+              ? `${new Date(item.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}, ${item.time || '10:00H'}`
+              : `May 3, 2026, ${item.time}`}
+          </dd>
 
           <dt>Location</dt>
           <dd>{item.location}</dd>
