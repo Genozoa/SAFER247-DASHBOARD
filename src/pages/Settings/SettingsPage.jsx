@@ -22,25 +22,8 @@ export default function SettingsPage() {
     <div className="page settings">
       {/* Toast Notice for actions */}
       {logoutNotice && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '80px',
-            right: '24px',
-            zIndex: 1000,
-            background: '#0f172a',
-            color: '#f8fafc',
-            padding: '12px 18px',
-            borderRadius: '8px',
-            fontSize: '13px',
-            fontWeight: 500,
-            boxShadow: '0 8px 24px rgba(15,23,42,0.2)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          <Check size={16} color="#4ade80" />
+        <div className="toast-notification">
+          <Check size={16} className="toast-icon-success" />
           <span>Operator session ended. To sign back in, contact your DRRMO supervisor.</span>
         </div>
       )}
@@ -135,64 +118,33 @@ export default function SettingsPage() {
       {showLogoutModal && (
         <div className="overlay" onClick={() => setShowLogoutModal(false)}>
           <div
-            className="modal"
-            style={{ maxWidth: '420px', minHeight: 'auto' }}
+            className="modal confirm-dialog"
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-              <div
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '50%',
-                  background: '#fef2f2',
-                  color: '#dc2626',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
+            <div className="confirm-dialog-header">
+              <div className="confirm-dialog-icon-danger">
                 <AlertCircle size={20} />
               </div>
-              <h2 style={{ margin: 0, fontSize: '18px', color: '#0f172a' }}>Confirm Log out</h2>
+              <h2 className="confirm-dialog-title">Confirm Log out</h2>
             </div>
 
-            <p style={{ margin: '0 0 20px', fontSize: '13px', color: '#64748b', lineHeight: 1.5 }}>
+            <p className="confirm-dialog-description">
               Are you sure you want to end your current operator shift session? Active radio frequencies
               and incoming reports will remain active in the command center.
             </p>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            <div className="confirm-dialog-actions">
               <button
                 type="button"
                 onClick={() => setShowLogoutModal(false)}
-                style={{
-                  border: '1px solid #cbd5e1',
-                  background: '#ffffff',
-                  color: '#475569',
-                  borderRadius: '8px',
-                  padding: '8px 14px',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                }}
+                className="confirm-btn-cancel"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleConfirmLogout}
-                style={{
-                  border: '0',
-                  background: '#dc2626',
-                  color: '#ffffff',
-                  borderRadius: '8px',
-                  padding: '8px 16px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
+                className="confirm-btn-danger"
               >
                 End Session
               </button>

@@ -204,7 +204,7 @@ export default function DashboardPage() {
                 return (
                   <div key={name}>
                     <span>{name}</span>
-                    <i style={{ width: `${widthPercent}%` }} />
+                    <i style={{ '--bar-width': `${widthPercent}%` }} />
                   </div>
                 );
               })}

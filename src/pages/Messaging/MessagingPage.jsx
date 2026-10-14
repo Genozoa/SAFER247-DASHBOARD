@@ -37,7 +37,7 @@ export default function MessagingPage() {
       </p>
 
       {/* Message Tabs */}
-      <div className="message-tabs" style={{ display: 'flex' }}>
+      <div className="message-tabs">
         <button
           type="button"
           className={!isReportsOnly ? 'selected' : ''}

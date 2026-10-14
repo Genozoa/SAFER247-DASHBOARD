@@ -28,11 +28,6 @@ export default function ExportReportModal({ count = 3, onClose }) {
               key={format}
               type="button"
               className={selectedFormat === format ? 'active' : ''}
-              style={
-                selectedFormat === format
-                  ? { background: '#1e293b', color: '#fff', borderColor: '#1e293b' }
-                  : {}
-              }
               onClick={() => setSelectedFormat(format)}
             >
               {format}

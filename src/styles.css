@@ -217,8 +217,7 @@ body {
     gap: 5px;
 }
 
-.nav-link,
-.logout {
+.nav-link {
     display: flex;
     align-items: center;
     gap: 13px;
@@ -240,6 +239,31 @@ body {
     position: absolute;
     bottom: 16px;
     left: 16px;
+    right: 16px;
+    width: calc(100% - 32px);
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    background: #ffffff;
+    border: 1px solid #fecaca;
+    color: #dc2626;
+    font-size: 15px;
+    font-weight: 600;
+    text-decoration: none;
+    padding: 12px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.logout:hover {
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: #b91c1c;
+}
+
+.logout:active {
+    transform: scale(0.98);
 }
 
 .messaging-nav {
@@ -473,6 +497,106 @@ body {
     margin: 0 0 12px;
 }
 
+/* Confirmation Dialogs & Alert Shells */
+.modal.confirm-dialog {
+    max-width: 420px;
+    min-height: auto;
+}
+
+.confirm-dialog-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.confirm-dialog-icon-danger {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #fef2f2;
+    color: #dc2626;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.confirm-dialog-title {
+    margin: 0;
+    font-size: 18px;
+    color: #0f172a;
+}
+
+.confirm-dialog-description {
+    margin: 0 0 20px;
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.5;
+}
+
+.confirm-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.confirm-btn-cancel {
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #475569;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.confirm-btn-cancel:hover {
+    background: #f1f5f9;
+    color: #1e293b;
+}
+
+.confirm-btn-danger {
+    border: 0;
+    background: #dc2626;
+    color: #ffffff;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.confirm-btn-danger:hover {
+    background: #b91c1c;
+}
+
+/* Floating Status & Toast Notifications */
+.toast-notification {
+    position: fixed;
+    top: 80px;
+    right: 24px;
+    z-index: 1000;
+    background: #0f172a;
+    color: #f8fafc;
+    padding: 12px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.toast-icon-success {
+    color: #4ade80;
+    flex-shrink: 0;
+}
+
 /* ==========================================================================
    6. Dashboard Page
    ========================================================================== */
@@ -648,6 +772,7 @@ select.mini-filter {
     background: #64748b;
     height: 16px;
     border-radius: 0 2px 2px 0;
+    width: var(--bar-width, 0%);
 }
 
 @media(max-width: 1200px) {
@@ -2795,6 +2920,17 @@ select.mini-filter {
     border: 1px solid #cbd5e1;
     border-radius: 8px;
     padding: 12px;
+    font: inherit;
+    font-size: 13px;
+    color: #334155;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.format-buttons button.active {
+    background: #1e293b;
+    color: #ffffff;
+    border-color: #1e293b;
 }
 
 .wide {
