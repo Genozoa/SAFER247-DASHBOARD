@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   LocateFixed,
   RotateCcw,
@@ -23,25 +23,47 @@ import {
   LIVE_OFFICERS,
   BARANGAY_COORDINATES,
   isWithinDateRange,
+  normalizeBarangay,
 } from '../../data/mockData';
 
 const MAP_MODES = ['Markers', 'Tracking', 'Heatmap'];
 
 export default function MapViewPage() {
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
-  const initialMode = searchParams.get('mode') || 'Markers';
-  const incidentIdParam = searchParams.get('incident');
+  const initialMode = searchParams.get('mode') || location?.state?.mode || 'Markers';
+  const incidentIdParam = searchParams.get('incident') || location?.state?.selectedIncidentId;
+  const initialTypeParam = searchParams.get('type') || location?.state?.selectedType || 'All Types';
+  const initialBarangayParam = searchParams.get('barangay') || location?.state?.selectedBarangay || 'All Barangays';
 
   const [mode, setMode] = useState(initialMode);
-  const [selectedType, setSelectedType] = useState('All Types');
+  const [selectedType, setSelectedType] = useState(initialTypeParam);
   const [selectedDateRange, setSelectedDateRange] = useState('Last 30 Days');
-  const [selectedBarangay, setSelectedBarangay] = useState('All Barangays');
+  const [selectedBarangay, setSelectedBarangay] = useState(
+    initialBarangayParam !== 'All Barangays' ? normalizeBarangay(initialBarangayParam) : 'All Barangays'
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIncident, setSelectedIncident] = useState(null);
   const [selectedOfficer, setSelectedOfficer] = useState(null);
   const [showBreadcrumbs, setShowBreadcrumbs] = useState(true);
   const [isBannerDismissed, setIsBannerDismissed] = useState(false);
+
+  // Sync state if navigation occurs with new params
+  useEffect(() => {
+    const t = searchParams.get('type') || location?.state?.selectedType;
+    if (t && t !== selectedType) {
+      setSelectedType(t);
+    }
+    const b = searchParams.get('barangay') || location?.state?.selectedBarangay;
+    if (b && b !== selectedBarangay) {
+      setSelectedBarangay(normalizeBarangay(b));
+    }
+    const m = searchParams.get('mode') || location?.state?.mode;
+    if (m && m !== mode) {
+      setMode(m);
+    }
+  }, [searchParams, location?.state]);
 
   // Reset dismissal state whenever filter criteria change so empty state shows again if new criteria has 0 matches
   useEffect(() => {

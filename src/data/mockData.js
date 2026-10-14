@@ -411,3 +411,147 @@ export const BARANGAYS = [
   'Brgy. Kalagangan',
   'Brgy. Kibongcog',
 ];
+
+// Helper to normalize barangay names against official 24 barangays of San Fernando, Bukidnon
+export const normalizeBarangay = (raw) => {
+  if (!raw) return 'Halapitan';
+  const clean = String(raw)
+    .replace(/^Brgy\.\s*/i, '')
+    .replace(/\s*\(Poblacion\)/i, '')
+    .replace(/\s*\(Tigwa Riverbank\)/i, '')
+    .replace(/\s*\(.*\)/i, '')
+    .trim();
+  const match = SAN_FERNANDO_BARANGAYS.find(
+    (b) => b.toLowerCase() === clean.toLowerCase()
+  );
+  return match || clean;
+};
+
+// Dashboard 7-Day Timeline Dataset
+export const TIMELINE_DATASETS = {
+  'All incident types': [
+    { label: 'SEP 15', value: 14 },
+    { label: 'SEP 16', value: 20 },
+    { label: 'SEP 17', value: 26 },
+    { label: 'SEP 18', value: 21 },
+    { label: 'SEP 19', value: 18 },
+    { label: 'SEP 20', value: 38 },
+    { label: 'TODAY', value: 47 },
+  ],
+  Fire: [
+    { label: 'SEP 15', value: 5 },
+    { label: 'SEP 16', value: 8 },
+    { label: 'SEP 17', value: 11 },
+    { label: 'SEP 18', value: 7 },
+    { label: 'SEP 19', value: 6 },
+    { label: 'SEP 20', value: 15 },
+    { label: 'TODAY', value: 18 },
+  ],
+  Flood: [
+    { label: 'SEP 15', value: 4 },
+    { label: 'SEP 16', value: 6 },
+    { label: 'SEP 17', value: 8 },
+    { label: 'SEP 18', value: 7 },
+    { label: 'SEP 19', value: 5 },
+    { label: 'SEP 20', value: 12 },
+    { label: 'TODAY', value: 16 },
+  ],
+  'Vehicular Accident': [
+    { label: 'SEP 15', value: 3 },
+    { label: 'SEP 16', value: 4 },
+    { label: 'SEP 17', value: 5 },
+    { label: 'SEP 18', value: 5 },
+    { label: 'SEP 19', value: 4 },
+    { label: 'SEP 20', value: 8 },
+    { label: 'TODAY', value: 9 },
+  ],
+  Medical: [
+    { label: 'SEP 15', value: 2 },
+    { label: 'SEP 16', value: 3 },
+    { label: 'SEP 17', value: 4 },
+    { label: 'SEP 18', value: 3 },
+    { label: 'SEP 19', value: 2 },
+    { label: 'SEP 20', value: 5 },
+    { label: 'TODAY', value: 7 },
+  ],
+  Landslide: [
+    { label: 'SEP 15', value: 1 },
+    { label: 'SEP 16', value: 2 },
+    { label: 'SEP 17', value: 3 },
+    { label: 'SEP 18', value: 2 },
+    { label: 'SEP 19', value: 1 },
+    { label: 'SEP 20', value: 4 },
+    { label: 'TODAY', value: 5 },
+  ],
+};
+
+// Hourly counts for today (hours 0 to 23, total 178)
+export const HOURLY_COUNTS_ALL = [
+  3, 2, 2, 2, 2, 3, 5, 7, 10, 8, 12, 10, 8, 8, 11, 12, 15, 13, 12, 10, 8, 7, 5, 3,
+];
+
+// Scaled factors for hourly types
+export const TYPE_SCALING = {
+  All: 1,
+  Fire: 0.38,
+  Flood: 0.30,
+  'Vehicular Accident': 0.20,
+  Medical: 0.15,
+  Landslide: 0.10,
+};
+
+// Daily counts for last 30 days (sum ~ 1,420)
+export const DAILY_COUNTS_ALL = [
+  38, 42, 39, 45, 52, 48, 41, 39, 44, 46, 50, 55, 49, 43, 40,
+  45, 48, 51, 47, 44, 42, 46, 53, 58, 50, 46, 44, 48, 52, 47,
+];
+
+// Monthly counts for last 12 months (sum ~ 16,840)
+export const MONTHLY_COUNTS_ALL = [
+  1280, 1340, 1410, 1390, 1460, 1520, 1490, 1380, 1420, 1450, 1480, 1210,
+];
+
+export const MONTH_LABELS = [
+  'OCT', 'NOV', 'DEC', 'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP',
+];
+
+// Type Distribution breakdown for San Fernando Command Center
+export const INCIDENT_TYPE_DISTRIBUTION = [
+  { type: 'Fire', count: 38, percentage: 32, color: '#D92D20', description: 'Structural, brush & kitchen fires' },
+  { type: 'Flood', count: 28, percentage: 24, color: '#1B57D6', description: 'River surge & flash floods' },
+  { type: 'Vehicular Accident', count: 24, percentage: 20, color: '#D97706', description: 'Highway & farm connector incidents' },
+  { type: 'Medical', count: 17, percentage: 14, color: '#10B981', description: 'Emergency trauma & medical transfer' },
+  { type: 'Landslide', count: 11, percentage: 10, color: '#8B5CF6', description: 'Slope displacement & road blockages' },
+];
+
+// Report by Barangay for ALL 24 official barangays of San Fernando, Bukidnon
+// Cleaned names matching SAN_FERNANDO_BARANGAYS, ranked highest to lowest
+export const BARANGAY_REPORTS_DATA = [
+  { barangay: 'Halapitan', count: 62, byType: { Fire: 22, Flood: 18, 'Vehicular Accident': 12, Medical: 7, Landslide: 3 }, lat: 7.9137, lng: 125.3362 },
+  { barangay: 'Little Baguio', count: 57, byType: { Fire: 19, Flood: 16, 'Vehicular Accident': 10, Medical: 8, Landslide: 4 }, lat: 7.9199, lng: 125.2880 },
+  { barangay: 'Kawayan', count: 48, byType: { Fire: 16, Flood: 14, 'Vehicular Accident': 9, Medical: 6, Landslide: 3 }, lat: 7.8998, lng: 125.3920 },
+  { barangay: 'Namnam', count: 41, byType: { Fire: 14, Flood: 12, 'Vehicular Accident': 7, Medical: 5, Landslide: 3 }, lat: 7.8382, lng: 125.3906 },
+  { barangay: 'Kalagangan', count: 34, byType: { Fire: 11, Flood: 10, 'Vehicular Accident': 6, Medical: 4, Landslide: 3 }, lat: 7.7132, lng: 125.3602 },
+  { barangay: 'Kibongcog', count: 29, byType: { Fire: 9, Flood: 9, 'Vehicular Accident': 5, Medical: 4, Landslide: 2 }, lat: 7.8548, lng: 125.3138 },
+  { barangay: 'Bonacao', count: 26, byType: { Fire: 8, Flood: 8, 'Vehicular Accident': 4, Medical: 4, Landslide: 2 }, lat: 7.8037, lng: 125.4007 },
+  { barangay: 'Tugop', count: 24, byType: { Fire: 7, Flood: 8, 'Vehicular Accident': 4, Medical: 3, Landslide: 2 }, lat: 7.9721, lng: 125.3172 },
+  { barangay: 'San Jose', count: 21, byType: { Fire: 7, Flood: 6, 'Vehicular Accident': 4, Medical: 2, Landslide: 2 }, lat: 7.7521, lng: 125.4117 },
+  { barangay: 'Nacabuklad', count: 19, byType: { Fire: 5, Flood: 6, 'Vehicular Accident': 3, Medical: 3, Landslide: 2 }, lat: 7.9639, lng: 125.3491 },
+  { barangay: 'Cabuling', count: 17, byType: { Fire: 5, Flood: 5, 'Vehicular Accident': 3, Medical: 2, Landslide: 2 }, lat: 7.6686, lng: 125.3761 },
+  { barangay: 'Bulalang', count: 16, byType: { Fire: 5, Flood: 5, 'Vehicular Accident': 3, Medical: 2, Landslide: 1 }, lat: 7.7568, lng: 125.3564 },
+  { barangay: 'Matupe', count: 15, byType: { Fire: 4, Flood: 5, 'Vehicular Accident': 3, Medical: 2, Landslide: 1 }, lat: 7.6447, lng: 125.4088 },
+  { barangay: 'Candelaria', count: 14, byType: { Fire: 4, Flood: 4, 'Vehicular Accident': 3, Medical: 2, Landslide: 1 }, lat: 7.9259, lng: 125.3802 },
+  { barangay: 'Cayaga', count: 13, byType: { Fire: 4, Flood: 4, 'Vehicular Accident': 2, Medical: 2, Landslide: 1 }, lat: 7.7315, lng: 125.4057 },
+  { barangay: 'Dao', count: 12, byType: { Fire: 3, Flood: 4, 'Vehicular Accident': 2, Medical: 2, Landslide: 1 }, lat: 7.7902, lng: 125.3416 },
+  { barangay: 'Durian', count: 11, byType: { Fire: 3, Flood: 3, 'Vehicular Accident': 2, Medical: 2, Landslide: 1 }, lat: 7.6422, lng: 125.3463 },
+  { barangay: 'Iglugsad', count: 11, byType: { Fire: 3, Flood: 3, 'Vehicular Accident': 2, Medical: 2, Landslide: 1 }, lat: 7.8255, lng: 125.3634 },
+  { barangay: 'Mabuhay', count: 10, byType: { Fire: 3, Flood: 3, 'Vehicular Accident': 2, Medical: 1, Landslide: 1 }, lat: 7.8865, lng: 125.3582 },
+  { barangay: 'Magkalungay', count: 9, byType: { Fire: 3, Flood: 2, 'Vehicular Accident': 2, Medical: 1, Landslide: 1 }, lat: 7.8631, lng: 125.3779 },
+  { barangay: 'Malayanan', count: 8, byType: { Fire: 2, Flood: 2, 'Vehicular Accident': 2, Medical: 1, Landslide: 1 }, lat: 7.9605, lng: 125.2909 },
+  { barangay: 'Palacpacan', count: 8, byType: { Fire: 2, Flood: 2, 'Vehicular Accident': 2, Medical: 1, Landslide: 1 }, lat: 7.7934, lng: 125.3731 },
+  { barangay: 'Sacramento Valley', count: 7, byType: { Fire: 2, Flood: 2, 'Vehicular Accident': 1, Medical: 1, Landslide: 1 }, lat: 7.9278, lng: 125.2678 },
+  { barangay: 'Santo Domingo', count: 6, byType: { Fire: 2, Flood: 1, 'Vehicular Accident': 1, Medical: 1, Landslide: 1 }, lat: 7.7733, lng: 125.4050 },
+];
+
+export const BARANGAY_DENSITY_DATA = BARANGAY_REPORTS_DATA;
+

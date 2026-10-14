@@ -55,7 +55,7 @@ export default function Sidebar() {
           title="End Command Center session"
         >
           <LogOut size={20} />
-          <span>Logout</span>
+          <span>Log out</span>
         </button>
       </aside>
 
