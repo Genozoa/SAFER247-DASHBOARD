@@ -19,13 +19,14 @@ import {
   SAN_FERNANDO_POBLACION,
   SAN_FERNANDO_BOUNDS,
   BARANGAY_COORDINATES,
+  SAN_FERNANDO_BARANGAYS,
 } from '../../data/mockData';
 import {
   SAN_FERNANDO_MUNICIPAL_BORDER,
-  SAN_FERNANDO_BARANGAYS_GEOJSON,
   BARANGAY_CENTROIDS,
   SAN_FERNANDO_MAP_BOUNDS,
 } from '../../data/sanFernandoBoundary';
+import sanFernandoBarangaysGeoJson from './san-fernando-barangays.geojson';
 import { createKdeHeatmapLayer } from './KdeHeatmapLayer';
 
 // Google Maps style tile configurations (clean embedded cartography)
@@ -356,7 +357,8 @@ export default function LeafletMap({
     municipalPolygonRef.current = redOverlay;
   }, [isMapReady, showMunicipalBorder, isOfflineFallback]);
 
-  // Render 24 Barangay Polygons & Selection Highlights (without redundant text overlays)
+  // Render 24 Barangay Boundaries from san-fernando-barangays.geojson
+  // Display requirements: Subtle boundary outlines without solid fills, display-only (no action on click)
   useEffect(() => {
     if (!isMapReady || !barangaysLayerRef.current) return;
     const layer = barangaysLayerRef.current;
@@ -364,81 +366,77 @@ export default function LeafletMap({
 
     if (!showBarangayPolygons) return;
 
-    SAN_FERNANDO_BARANGAYS_GEOJSON.features.forEach((feature) => {
-      const bgyName = feature.properties.name;
-      const isSelected = selectedBarangay === bgyName;
-
-      // In GeoJSON coordinates are [lng, lat]; convert correctly to Leaflet [lat, lng] format
-      // Support standard Polygon as well as MultiPolygon geometries without distortion
-      let latLngs;
-      if (feature.geometry.type === 'MultiPolygon') {
-        latLngs = feature.geometry.coordinates.map((poly) =>
-          poly.map((ring) => ring.map(([lng, lat]) => [lat, lng]))
+    const geoJsonLayer = L.geoJSON(sanFernandoBarangaysGeoJson, {
+      style: (feature) => {
+        const bgyName = feature?.properties?.adm4_en || feature?.properties?.name || '';
+        const isSelected = Boolean(
+          selectedBarangay &&
+            selectedBarangay !== 'All Barangays' &&
+            selectedBarangay.toLowerCase() === bgyName.toLowerCase()
         );
-      } else {
-        // Standard Polygon
-        latLngs = feature.geometry.coordinates.map((ring) =>
-          ring.map(([lng, lat]) => [lat, lng])
+
+        return {
+          color: isSelected ? '#2563eb' : '#64748b',
+          weight: isSelected ? 2.5 : 1.5,
+          dashArray: isSelected ? undefined : '3, 4',
+          opacity: isSelected ? 1 : 0.7,
+          fill: false, // Subtle boundary outlines without solid fills
+          fillOpacity: 0,
+        };
+      },
+      onEachFeature: (feature, polygon) => {
+        const bgyName = feature?.properties?.adm4_en || feature?.properties?.name || 'Barangay';
+        const psgc = feature?.properties?.adm4_psgc;
+        const area = feature?.properties?.area_km2;
+
+        polygon.bindTooltip(
+          `<div style="font-size: 11px; line-height: 1.4; padding: 2px 4px;">
+            <strong style="color: #0369a1; font-weight: 700;">Brgy. ${bgyName}</strong><br/>
+            <span style="color: #64748b;">San Fernando, Bukidnon</span>
+            ${psgc ? `<br/><span style="color: #94a3b8; font-size: 10px;">PSGC: ${psgc}${area ? ` • Area: ${area} km²` : ''}</span>` : ''}
+          </div>`,
+          { sticky: true, className: 'bgy-tooltip' }
         );
-      }
 
-      const polygon = L.polygon(latLngs, {
-        color: isSelected ? '#1d4ed8' : '#64748b',
-        weight: isSelected ? 3 : 1.2,
-        dashArray: isSelected ? undefined : '3, 4',
-        opacity: isSelected ? 1 : 0.65,
-        fillColor: isSelected ? '#2563eb' : '#64748b',
-        fillOpacity: isSelected ? 0.28 : 0.03,
-      });
+        polygon.on('mouseover', function () {
+          const isSelected = Boolean(
+            selectedBarangay &&
+              selectedBarangay !== 'All Barangays' &&
+              selectedBarangay.toLowerCase() === bgyName.toLowerCase()
+          );
+          if (!isSelected) {
+            this.setStyle({
+              color: '#3b82f6',
+              weight: 2,
+              opacity: 0.9,
+            });
+          }
+        });
 
-      polygon.bindTooltip(
-        `<div style="font-size: 11px; line-height: 1.4;">
-          <strong style="color: #0284c7;">Brgy. ${bgyName}</strong><br/>
-          <span style="color: #64748b;">San Fernando, Bukidnon • PSGC: ${feature.properties.psgc}</span><br/>
-          <small style="color: #0369a1;">Click to inspect incidents</small>
-        </div>`,
-        { sticky: true, className: 'bgy-tooltip' }
-      );
+        polygon.on('mouseout', function () {
+          const isSelected = Boolean(
+            selectedBarangay &&
+              selectedBarangay !== 'All Barangays' &&
+              selectedBarangay.toLowerCase() === bgyName.toLowerCase()
+          );
+          if (!isSelected) {
+            this.setStyle({
+              color: '#64748b',
+              weight: 1.5,
+              opacity: 0.7,
+            });
+          }
+        });
 
-      polygon.on('mouseover', function () {
-        if (selectedBarangay !== bgyName) {
-          this.setStyle({
-            color: '#2563eb',
-            weight: 2.2,
-            dashArray: undefined,
-            fillColor: '#3b82f6',
-            fillOpacity: 0.18,
-          });
-        }
-      });
-
-      polygon.on('mouseout', function () {
-        if (selectedBarangay !== bgyName) {
-          this.setStyle({
-            color: '#64748b',
-            weight: 1.2,
-            dashArray: '3, 4',
-            fillColor: '#64748b',
-            fillOpacity: 0.03,
-          });
-        }
-      });
-
-      polygon.on('click', (e) => {
-        L.DomEvent.stopPropagation(e);
-        if (onSelectBarangay) {
-          onSelectBarangay(bgyName);
-        }
-      });
-
-      layer.addLayer(polygon);
-
-      // If this is the active barangay, bring to front
-      if (isSelected) {
-        polygon.bringToFront();
-      }
+        // User preference: "No action on click, display boundaries only"
+        polygon.on('click', (e) => {
+          L.DomEvent.stopPropagation(e);
+        });
+      },
     });
-  }, [isMapReady, showBarangayPolygons, selectedBarangay, onSelectBarangay]);
+
+    layer.addLayer(geoJsonLayer);
+  }, [isMapReady, showBarangayPolygons, selectedBarangay]);
 
   // Fly to selected Barangay: Preserves user's current zoom level so navigating between areas NEVER zooms out!
   useEffect(() => {
