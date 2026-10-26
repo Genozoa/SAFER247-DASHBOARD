@@ -1487,83 +1487,256 @@ body {
    7. Messaging Page (Radio Broadcast)
    ========================================================================== */
 .messaging {
-    padding: 17px 16px 104px;
+    height: calc(100vh - 64px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #f8fafc;
+    padding: 0;
 }
 
-.messaging h1 {
+.messaging-header-compact {
+    flex-shrink: 0;
+    background: #ffffff;
+    border-bottom: 1px solid #dce3ec;
+    padding: 14px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 10;
+}
+
+.messaging-header-compact h1 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.messaging-compact-bar {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    width: 100%;
+}
+
+.messaging-filter-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.messaging-filter-label {
+    font-family: 'Archivo', sans-serif;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #475569;
+    letter-spacing: 0.02em;
+}
+
+/* Compact Segmented Tabs (ALL / REPORTS) matching design */
+.messaging-segment-tabs {
+    display: inline-flex;
+    align-items: center;
+    background: #eef2f8;
+    border: 1px solid #dce3ec;
+    border-radius: 8px;
+    padding: 3px;
+    flex-shrink: 0;
+}
+
+.messaging-segment-tabs button {
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: #5b6b82;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    line-height: 1;
+}
+
+.messaging-segment-tabs button.active {
+    background: #ffffff;
+    color: #0f172a;
+    font-weight: 700;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.messaging-segment-tabs button:hover:not(.active) {
+    color: #1e293b;
+}
+
+/* Compact Search Box with Integrated Icon */
+.messaging-search-wrapper {
+    position: relative;
+    flex: 1;
     display: flex;
     align-items: center;
-    gap: 9px;
 }
 
-.messaging h1 i {
-    height: 12px;
-    width: 12px;
-    border-radius: 50%;
-    background: #4ade80;
+.messaging-search-wrapper svg {
+    position: absolute;
+    left: 12px;
+    color: #8593a6;
+    pointer-events: none;
 }
 
-.message-tabs {
-    display: flex;
-    gap: 8px;
-    margin: 0 0 14px;
-}
-
-.message-tabs button {
-    border: 1px solid #cbd5e1;
-    background: #fff;
+.messaging-search-input {
+    width: 100%;
+    height: 38px;
+    border: 1px solid #dce3ec;
     border-radius: 8px;
-    padding: 8px 13px;
-    font: inherit;
-    color: #475569;
+    padding: 0 12px 0 36px;
+    font-family: 'Archivo', sans-serif;
+    font-size: 13.5px;
+    color: #172033;
+    background: #ffffff;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.message-tabs button.selected {
-    background: #1e293b;
-    color: #fff;
-    border-color: #1e293b;
+.messaging-search-input:focus {
+    border-color: #1b57d6;
+    box-shadow: 0 0 0 3px rgba(27, 87, 214, 0.12);
 }
 
-.toolbar {
+.messaging-search-input::placeholder {
+    color: #8593a6;
+}
+
+/* Date Filter (Compact in both channels) */
+.messaging-date-wrapper {
+    position: relative;
     display: flex;
-    gap: 12px;
-    align-items: end;
-    border-bottom: 1px solid #d9e0e9;
-    padding: 0 0 16px;
+    align-items: center;
+    flex-shrink: 0;
 }
 
-.toolbar input {
-    height: 39px;
-    border: 1px solid #cbd5e1;
-    border-radius: 10px;
-    padding: 0 12px;
-    font: inherit;
-    flex: 1;
-}
-
-.date-filter,
-.type-filter {
-    display: grid;
-    gap: 4px;
-    font-size: 12px;
-    color: #475569;
-}
-
-.date-filter input,
-.type-filter select {
-    height: 39px;
-    border: 1px solid #cbd5e1;
-    background: #fff;
-    border-radius: 10px;
+.messaging-date-input {
+    height: 38px;
+    border: 1px solid #dce3ec;
+    background: #ffffff;
+    border-radius: 8px;
     padding: 0 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: #1e293b;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.messaging-date-input:focus {
+    border-color: #1b57d6;
+    box-shadow: 0 0 0 3px rgba(27, 87, 214, 0.12);
+}
+
+.messaging-date-clear-btn {
+    position: absolute;
+    right: 28px;
+    background: #e2e8f0;
+    border: none;
     color: #475569;
-    font: inherit;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+}
+
+.messaging-date-clear-btn:hover {
+    background: #cbd5e1;
+    color: #0f172a;
+}
+
+/* Incident Type Dropdown (Shown only in Incident Reports channel) */
+.messaging-type-select {
+    height: 38px;
+    border: 1px solid #dce3ec;
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 0 12px;
+    font-family: 'Archivo', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: #1e293b;
+    outline: none;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: border-color 0.15s ease;
+}
+
+.messaging-type-select:focus {
+    border-color: #1b57d6;
+}
+
+.feed-container {
+    flex: 1;
+    overflow-y: auto;
+    position: relative;
+    padding: 16px 24px 84px;
 }
 
 .feed {
-    padding: 32px 8px;
-    display: grid;
-    gap: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* 1. Time Divider (Embedded in Page) */
+.time-divider-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin: 18px 0 10px;
+}
+
+.time-divider-line {
+    flex: 1;
+    height: 1px;
+    background: #DCE3EC;
+}
+
+.time-divider-pill {
+    pointer-events: auto;
+    height: 24px;
+    min-height: 24px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid #DCE3EC;
+    background: #FFFFFF;
+    color: #5B6B82;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+/* Message Wrapper & Bubbles */
+.message-wrapper {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
 }
 
 .message {
@@ -1573,161 +1746,385 @@ body {
     border: 1px solid #cbd5e1;
     background: #fff;
     border-radius: 11px;
-    box-shadow: 0 2px 4px #17203310;
+    box-shadow: 0 2px 4px rgba(23, 32, 51, 0.05);
+    font-family: 'Archivo', sans-serif;
 }
 
-.message>b {
+.message > b {
     display: block;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #0f172a;
 }
 
-.message small {
-    position: absolute;
-    right: 15px;
-    top: 18px;
-    color: #64748b;
+.outgoing > b {
+    color: #f8fafc;
 }
 
 .message p {
     line-height: 1.45;
     margin: 10px 0 0;
+    font-size: 14px;
+}
+
+.incoming {
+    align-self: flex-start;
+    border-color: #cbd5e1;
+    background: #ffffff;
+    color: #172033;
 }
 
 .outgoing {
+    align-self: flex-end;
     margin-left: auto;
     background: #1e293b;
     color: #fff;
-    min-width: 430px;
+    min-width: 400px;
+    border-color: #334155;
 }
 
-.failed {
-    border-color: #fca5a5;
+/* 3. Outgoing Bubble that Failed: Dashed 1.5px #FDA29B outline & 0.9 text opacity */
+.message.outgoing.failed-bubble {
+    border: 1.5px dashed #FDA29B !important;
 }
 
-.failed>span {
-    display: block;
-    color: #dc2626;
-    font-size: 12px;
-    margin-top: 9px;
+.message.outgoing.failed-bubble p,
+.message.outgoing.failed-bubble b {
+    opacity: 0.9;
 }
 
-.failed>button {
-    position: absolute;
-    right: 14px;
-    bottom: 13px;
-    background: #dc2626;
-    color: #fff;
-    border: 0;
-    border-radius: 7px;
-    padding: 6px 11px;
-}
-
-.retry-status {
-    position: absolute;
-    right: 0;
-    top: calc(100% + 12px);
-    display: flex;
+/* Status Row under Failed Bubble */
+.failed-status-row {
+    align-self: flex-end;
+    margin-left: auto;
+    display: inline-flex;
     align-items: center;
-    gap: 11px;
-    color: #ef4444;
-    font-weight: 700;
+    gap: 8px;
+    background: #FEF3F2;
+    border: 1px solid #FDA29B;
+    border-radius: 8px;
+    padding: 6px 12px;
+    margin-top: 5px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 2px rgba(180, 35, 24, 0.04);
+}
+
+.failed-status-row .alert-icon {
+    color: #B42318;
+    flex-shrink: 0;
+}
+
+.failed-status-row .status-label {
+    color: #B42318;
+    font-family: 'Archivo', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
     white-space: nowrap;
 }
 
-.retry-status button {
-    width: 48px;
-    height: 48px;
-    border: 0;
-    border-radius: 50%;
-    background: #ef101b;
-    color: white;
-    font-size: 30px;
-    line-height: 1;
+.retry-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #B42318;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-family: 'Archivo', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 2px 5px #991b1b55;
+    transition: background-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+    white-space: nowrap;
 }
 
-.message.failed {
-    margin-bottom: 54px;
-    border-color: transparent;
+.retry-action-btn:hover:not(:disabled) {
+    background: #912018;
 }
 
-.message.failed .retry-status span {
-    font-size: 15px;
+.retry-action-btn:active:not(:disabled) {
+    transform: scale(0.98);
 }
 
+.retry-action-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #B42318;
+}
+
+.retry-action-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.85;
+}
+
+/* 4. SENT / TRANSMITTING indicator only under latest outgoing message */
+.latest-outgoing-indicator {
+    align-self: flex-end;
+    margin-left: auto;
+    margin-top: 3px;
+    margin-bottom: 6px;
+    padding-right: 4px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: #8593A6;
+    text-transform: uppercase;
+}
+
+/* 5. Message Header Timestamp & Tooltip */
+.msg-time-container {
+    position: absolute;
+    right: 15px;
+    top: 15px;
+}
+
+.msg-timestamp-link {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: #8593A6;
+    letter-spacing: 0.02em;
+    text-decoration: none;
+    cursor: default;
+    border-radius: 4px;
+    padding: 1px 3px;
+    transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.outgoing .msg-timestamp-link {
+    color: #94A3B8;
+}
+
+.msg-timestamp-link:hover,
+.msg-timestamp-link:focus-visible {
+    color: #1B57D6;
+    background-color: rgba(27, 87, 214, 0.08);
+    outline: none;
+}
+
+.outgoing .msg-timestamp-link:hover,
+.outgoing .msg-timestamp-link:focus-visible {
+    color: #93C5FD;
+    background-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Custom Tooltip on Hover / Focus */
+.msg-time-container .custom-tooltip {
+    position: absolute;
+    bottom: calc(100% + 5px);
+    right: 0;
+    background: #0f172a;
+    color: #f8fafc;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(3px);
+    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+    z-index: 20;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.25);
+}
+
+.msg-time-container:hover .custom-tooltip,
+.msg-time-container:focus-within .custom-tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+/* Report box & image box */
 .report-box {
     border: 1px solid #cbd5e1;
+    border-radius: 8px;
     margin-top: 12px;
-    padding: 10px;
+    padding: 12px;
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
+    background: #f8fafc;
+}
+
+.report-box code {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1B57D6;
 }
 
 .report-box p {
     grid-column: 1/3;
     margin: 0;
-    color: #64748b;
+    color: #475569;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
 }
 
 .image-message {
-    width: 235px;
+    width: 250px;
 }
 
 .image-placeholder {
-    min-height: 170px;
-    background: #d5dbe5;
-    color: #526174;
-    border: 1px solid #94a3b8;
+    min-height: 140px;
+    background: #e2e8f0;
+    color: #475569;
+    border: 1px dashed #94a3b8;
     border-radius: 9px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 9px;
+    gap: 8px;
     margin-top: 12px;
+    font-size: 12px;
 }
 
+/* 2. Composer & Transmit Button */
 .composer {
     position: fixed;
     bottom: 0;
     left: 256px;
     right: 0;
     background: #fff;
-    border-top: 1px solid #cbd5e1;
-    padding: 16px;
+    border-top: 1px solid #d9e0e9;
+    padding: 12px 16px 14px;
     display: grid;
-    grid-template-columns: 38px 38px 1fr 56px;
+    grid-template-columns: 38px 38px 1fr auto;
     gap: 10px;
+    align-items: center;
+    z-index: 20;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.04);
 }
 
-.composer input {
-    border: 1px solid #cbd5e1;
-    border-radius: 10px;
-    padding: 0 14px;
-    font: inherit;
-}
-
-.composer button {
+.composer button.icon-action-btn {
+    height: 42px;
+    width: 38px;
     border: 1px solid #cbd5e1;
     background: #fff;
     border-radius: 9px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #475569;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
-.composer .send {
-    background: #1e293b;
-    color: white;
-    border: 0;
+.composer button.icon-action-btn:hover {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+    color: #1e293b;
+}
+
+.composer-textarea {
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-family: 'Archivo', sans-serif;
+    font-size: 14px;
+    line-height: 1.4;
+    resize: none;
+    height: 42px;
+    max-height: 120px;
+    color: #172033;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    box-sizing: border-box;
+}
+
+.composer-textarea:focus {
+    border-color: #1B57D6;
+    box-shadow: 0 0 0 3px rgba(27, 87, 214, 0.15);
+}
+
+.transmit-btn {
+    height: 42px;
+    border-radius: 10px;
+    background: #1B57D6;
+    color: #FFFFFF;
+    border: none;
+    padding: 0 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-family: 'Archivo', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+    white-space: nowrap;
+}
+
+.transmit-btn:hover:not(:disabled) {
+    background: #123F9E;
+}
+
+.transmit-btn:active:not(:disabled) {
+    background: #0E3280;
+    transform: scale(0.98);
+}
+
+.transmit-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px #FFFFFF, 0 0 0 4px #1B57D6;
+}
+
+.transmit-btn:disabled {
+    background: #B9C6DA;
+    color: #FFFFFF;
+    cursor: not-allowed;
+    transform: none;
 }
 
 .composer small {
     grid-column: 1/-1;
     color: #64748b;
+    font-size: 11.5px;
+    margin-top: -2px;
+}
+
+/* Spinners */
+@keyframes spin-anim {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.spinner-16 {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #FFFFFF;
+    border-radius: 50%;
+    animation: spin-anim 0.75s linear infinite;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.spinner-12 {
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #FFFFFF;
+    border-radius: 50%;
+    animation: spin-anim 0.75s linear infinite;
+    display: inline-block;
+    flex-shrink: 0;
 }
 
 @media(max-width: 760px) {
     .composer {
         left: 0;
+        grid-template-columns: 36px 36px 1fr auto;
+        padding: 10px 12px;
     }
     .outgoing {
         min-width: 0;
@@ -1739,7 +2136,7 @@ body {
         flex-basis: 100%;
     }
     .messaging {
-        padding: 16px;
+        padding: 16px 12px 110px;
     }
 }
 
