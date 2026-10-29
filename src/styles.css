@@ -3122,6 +3122,13 @@ body {
     z-index: 650 !important;
 }
 
+/* Interactive Barangay Boundary Polygons */
+.barangay-polygon {
+    cursor: pointer !important;
+    pointer-events: all !important;
+    transition: stroke 0.15s ease, stroke-width 0.15s ease, stroke-opacity 0.15s ease;
+}
+
 /* Google Maps Style Barangay Labels & Regional Border Markers */
 .google-map-bgy-label {
     background: transparent !important;
@@ -4318,5 +4325,19 @@ body {
         width: 100%;
         justify-content: center;
     }
+}
+
+/* ==========================================================================
+   Barangay Cadastre Interactive Boundaries
+   ========================================================================== */
+.barangay-polygon {
+    cursor: pointer !important;
+    pointer-events: auto !important;
+    outline: none !important;
+    transition: stroke 0.15s ease, stroke-width 0.15s ease, stroke-opacity 0.15s ease;
+}
+
+.barangay-polygon:focus {
+    outline: none !important;
 }
 
