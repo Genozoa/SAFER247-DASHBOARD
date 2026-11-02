@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   Monitor,
   MessageSquare,
@@ -22,6 +22,47 @@ const NAV_LINKS = [
 export default function Sidebar() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [logoutNotice, setLogoutNotice] = useState(false);
+  const location = useLocation();
+  const navRef = useRef(null);
+  const [sliderPos, setSliderPos] = useState({ top: 0, height: 48, opacity: 0 });
+
+  const updateSlider = useCallback(() => {
+    if (!navRef.current) return;
+    const activeLink = navRef.current.querySelector('.nav-link.active');
+    if (activeLink) {
+      setSliderPos({
+        top: activeLink.offsetTop,
+        height: activeLink.offsetHeight,
+        opacity: 1,
+      });
+    } else {
+      setSliderPos((prev) => ({ ...prev, opacity: 0 }));
+    }
+  }, []);
+
+  useEffect(() => {
+    // Schedule after React DOM flush
+    const frameId = requestAnimationFrame(() => {
+      updateSlider();
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [location.pathname, updateSlider]);
+
+  useEffect(() => {
+    window.addEventListener('resize', updateSlider);
+    return () => window.removeEventListener('resize', updateSlider);
+  }, [updateSlider]);
+
+  const handleNavClick = (e) => {
+    const el = e.currentTarget;
+    if (el) {
+      setSliderPos({
+        top: el.offsetTop,
+        height: el.offsetHeight,
+        opacity: 1,
+      });
+    }
+  };
 
   const handleConfirmLogout = () => {
     setShowLogoutModal(false);
@@ -34,16 +75,28 @@ export default function Sidebar() {
   return (
     <>
       <aside className="sidebar">
-        <nav>
+        <nav className="sidebar-nav" ref={navRef}>
+          {/* Animated sliding background pill */}
+          <div
+            className="sidebar-nav-slider"
+            style={{
+              transform: `translateY(${sliderPos.top}px)`,
+              height: `${sliderPos.height}px`,
+              opacity: sliderPos.opacity,
+            }}
+            aria-hidden="true"
+          />
+
           {NAV_LINKS.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
               to={to}
               end={to === '/'}
+              onClick={handleNavClick}
               className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
             >
-              <Icon size={20} />
-              <span>{label}</span>
+              <Icon size={20} className="nav-icon" />
+              <span className="nav-label">{label}</span>
             </NavLink>
           ))}
         </nav>

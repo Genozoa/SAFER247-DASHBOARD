@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronDown, Check, Search } from 'lucide-react';
 
 export default function SelectDropdown({
@@ -11,15 +11,44 @@ export default function SelectDropdown({
   searchable = true,
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const containerRef = useRef(null);
   const searchInputRef = useRef(null);
+  const closeTimeoutRef = useRef(null);
+
+  // Smooth closing with exit animation
+  const closeDropdown = useCallback(() => {
+    if (!isOpen || isClosing) return;
+    setIsClosing(true);
+    closeTimeoutRef.current = setTimeout(() => {
+      setIsOpen(false);
+      setIsClosing(false);
+    }, 170);
+  }, [isOpen, isClosing]);
+
+  const openDropdown = useCallback(() => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+    setIsClosing(false);
+    setIsOpen(true);
+  }, []);
+
+  const toggleDropdown = useCallback(() => {
+    if (isOpen && !isClosing) {
+      closeDropdown();
+    } else {
+      openDropdown();
+    }
+  }, [isOpen, isClosing, closeDropdown, openDropdown]);
 
   // Close dropdown on outside click
   useEffect(() => {
     function handleClickOutside(event) {
       if (containerRef.current && !containerRef.current.contains(event.target)) {
-        setIsOpen(false);
+        closeDropdown();
       }
     }
 
@@ -29,17 +58,41 @@ export default function SelectDropdown({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isOpen]);
+  }, [isOpen, closeDropdown]);
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Focus search input when opened
   useEffect(() => {
-    if (isOpen && searchInputRef.current) {
+    if (isOpen && !isClosing && searchInputRef.current) {
       searchInputRef.current.focus();
     }
     if (!isOpen) {
       setSearchTerm('');
     }
-  }, [isOpen]);
+  }, [isOpen, isClosing]);
+
+  // Close on Escape key
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === 'Escape' && isOpen) {
+        closeDropdown();
+      }
+    }
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, closeDropdown]);
 
   const displayValue = value !== undefined ? value : children;
 
@@ -53,30 +106,33 @@ export default function SelectDropdown({
     if (onChange) {
       onChange(option);
     }
-    setIsOpen(false);
+    closeDropdown();
   };
 
   return (
     <div
-      className={`select-dropdown-container ${className}`}
+      className={`select-dropdown-container ${className} ${isOpen && !isClosing ? 'is-open' : ''}`}
       ref={containerRef}
     >
       <button
         type="button"
-        className={`select ${isOpen ? 'open' : ''}`}
-        onClick={() => setIsOpen((prev) => !prev)}
+        className={`select ${isOpen && !isClosing ? 'open' : ''}`}
+        onClick={toggleDropdown}
         aria-haspopup="listbox"
-        aria-expanded={isOpen}
+        aria-expanded={isOpen && !isClosing}
       >
         <span className="select-text">{displayValue || placeholder}</span>
         <ChevronDown
           size={16}
-          className={`select-chevron ${isOpen ? 'rotated' : ''}`}
+          className={`select-chevron ${isOpen && !isClosing ? 'rotated' : ''}`}
         />
       </button>
 
       {isOpen && options.length > 0 && (
-        <div className="select-menu" role="listbox">
+        <div
+          className={`select-menu ${isClosing ? 'closing' : 'opening'}`}
+          role="listbox"
+        >
           {searchable && options.length > 7 && (
             <div className="select-search">
               <Search size={13} />
@@ -93,7 +149,7 @@ export default function SelectDropdown({
 
           <div className="select-options-list">
             {filteredOptions.length > 0 ? (
-              filteredOptions.map((option) => {
+              filteredOptions.map((option, idx) => {
                 const isSelected = option === value;
                 return (
                   <button
@@ -102,6 +158,7 @@ export default function SelectDropdown({
                     role="option"
                     aria-selected={isSelected}
                     className={`select-option ${isSelected ? 'selected' : ''}`}
+                    style={{ '--item-idx': Math.min(idx, 12) }}
                     onClick={() => handleSelect(option)}
                   >
                     <span>{option}</span>

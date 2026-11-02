@@ -13,7 +13,7 @@ import {
   isWithinDateRange,
 } from '../../data/mockData';
 
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 8;
 
 export default function ReportsPage() {
   const navigate = useNavigate();

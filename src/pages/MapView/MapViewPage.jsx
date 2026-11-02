@@ -131,11 +131,12 @@ export default function MapViewPage() {
     <div className="page map-page">
       {/* Filters & Mode Tabs Bar */}
       <div className="filter-row map-filter-toolbar">
-        <label className="filter-label search-field">
-          <span>Search Incident</span>
+        <div className="filter-label search-field">
+          <label htmlFor="map-search-input">Search Incident</label>
           <div className="search-input-box">
             <Search size={14} className="search-icon" />
             <input
+              id="map-search-input"
               type="text"
               placeholder="Search incidents or keywords..."
               value={searchQuery}
@@ -152,9 +153,9 @@ export default function MapViewPage() {
               </button>
             )}
           </div>
-        </label>
+        </div>
 
-        <label className="filter-label dropdown-field">
+        <div className="filter-label dropdown-field">
           <span>Incident Type</span>
           <SelectDropdown
             value={selectedType}
@@ -162,9 +163,9 @@ export default function MapViewPage() {
             options={INCIDENT_TYPES}
             searchable={false}
           />
-        </label>
+        </div>
 
-        <label className="filter-label dropdown-field">
+        <div className="filter-label dropdown-field">
           <span>Date Range</span>
           <SelectDropdown
             value={selectedDateRange}
@@ -172,9 +173,9 @@ export default function MapViewPage() {
             options={DATE_RANGE_OPTIONS}
             searchable={false}
           />
-        </label>
+        </div>
 
-        <label className="filter-label dropdown-field bgy-field">
+        <div className="filter-label dropdown-field bgy-field">
           <span>Barangays</span>
           <SelectDropdown
             value={selectedBarangay}
@@ -182,7 +183,7 @@ export default function MapViewPage() {
             options={BARANGAY_OPTIONS}
             searchable={true}
           />
-        </label>
+        </div>
 
         {hasActiveFilters && (
           <button
