@@ -69,9 +69,7 @@ Get-Content -LiteralPath $environmentFile | ForEach-Object {
         [Environment]::SetEnvironmentVariable($name, $value, 'Process')
     }
 }
-if (-not $env:RADIO_ENABLED) {
-    $env:RADIO_ENABLED = 'true'
-}
+# Radio is opt-in via RADIO_ENABLED in the private .env file.
 if (-not $env:DATABASE_URL) {
     throw 'DATABASE_URL is missing from .env.'
 }
@@ -146,7 +144,7 @@ $apiCommand = 'Set-Location -LiteralPath ' +
     ' -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000'
 $frontendCommand = 'Set-Location -LiteralPath ' +
     (ConvertTo-PowerShellLiteral $frontendDirectory) +
-    '; $env:VITE_OPERATIONAL_DATA_SOURCE = ''api''; npm.cmd run dev'
+    '; npm.cmd run dev'
 
 Start-PowerShellWindow -WorkingDirectory $backendDirectory -Command $apiCommand
 Start-PowerShellWindow -WorkingDirectory $frontendDirectory -Command $frontendCommand

@@ -1,3 +1,5 @@
+> **Current deployment instructions:** See [docs/LDRRMO_DEPLOYMENT.md](../../docs/LDRRMO_DEPLOYMENT.md). This file contains older prototype notes. Apply Alembic through 0008, never rely on historical schema.sql for upgrades.
+
 # SAFER 247 database and persistence layer
 
 The backend persistence layer uses SQLAlchemy 2.x and PostgreSQL with the

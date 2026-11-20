@@ -1,3 +1,5 @@
+IMPORTANT: This guide contains older revision references. Follow docs/LDRRMO_DEPLOYMENT.md for approval, role permissions, offline tiles, and migration 0008. Never use demo mode in frontend.
+
 SAFER 247 - BEGINNER SETUP AND RUN GUIDE (WINDOWS)
 =================================================
 

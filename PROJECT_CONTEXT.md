@@ -1,3 +1,5 @@
+> **Updated implementation:** Authentication requires a private registration code and explicit operator approval; frontend demo records were removed. See [docs/LDRRMO_DEPLOYMENT.md](docs/LDRRMO_DEPLOYMENT.md). The historical notes below describe earlier prototypes.
+
 # SAFER 247 — Project Context
 
 ## Project Title
