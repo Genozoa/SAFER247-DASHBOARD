@@ -6,18 +6,9 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import {
-  INCIDENTS as DEMO_INCIDENTS,
-  MESSAGES as DEMO_MESSAGES,
-  createDemoOutgoingMessage,
-  getOperationalDataSource,
-} from './operationalData.js';
-
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
-const CONFIGURED_DATA_SOURCE = import.meta.env.VITE_OPERATIONAL_DATA_SOURCE || '';
 const OperationalDataContext = createContext(null);
 
-let demoMessageSequence = 0;
 
 async function request(path, options) {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -39,22 +30,14 @@ async function request(path, options) {
 }
 
 export function OperationalDataProvider({ children, operator }) {
-  const dataSource = getOperationalDataSource(
-    operator?.call_sign,
-    CONFIGURED_DATA_SOURCE,
-  );
-  const [incidents, setIncidents] = useState(
-    dataSource === 'demo' ? DEMO_INCIDENTS : [],
-  );
+  const dataSource = 'api';
+  const [incidents, setIncidents] = useState([]);
   const [officers, setOfficers] = useState([]);
-  const [messages, setMessages] = useState(
-    dataSource === 'demo' ? DEMO_MESSAGES : [],
-  );
-  const [loading, setLoading] = useState(dataSource === 'api');
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const refresh = useCallback(async (silent = false) => {
-    if (dataSource === 'demo') return;
     if (!silent) setLoading(true);
     setError('');
     try {
@@ -74,7 +57,6 @@ export function OperationalDataProvider({ children, operator }) {
   }, [dataSource]);
 
   useEffect(() => {
-    if (dataSource === 'demo') return undefined;
     refresh();
     const timer = setInterval(() => {
       if (typeof document === 'undefined' || document.visibilityState === 'visible') refresh(true);
@@ -85,16 +67,6 @@ export function OperationalDataProvider({ children, operator }) {
   const sendMessage = useCallback(async (content) => {
     const trimmed = content.trim();
     if (!trimmed) throw new Error('Message content is required.');
-
-    if (dataSource === 'demo') {
-      const demoMessage = createDemoOutgoingMessage(
-        trimmed,
-        operator?.call_sign,
-        ++demoMessageSequence,
-      );
-      setMessages((current) => [...current, demoMessage]);
-      return demoMessage;
-    }
 
     const queuedMessage = await request('/operations/messages', {
       method: 'POST',
@@ -108,9 +80,6 @@ export function OperationalDataProvider({ children, operator }) {
   }, [dataSource, operator?.call_sign]);
 
   const retryMessage = useCallback(async (id) => {
-    if (dataSource === 'demo') {
-      throw new Error('Demo messages are local-only and cannot be retried or transmitted.');
-    }
     const retriedMessage = await request(`/radio/transmissions/${encodeURIComponent(id)}/retry`, {
       method: 'POST',
     });
@@ -129,10 +98,6 @@ export function OperationalDataProvider({ children, operator }) {
     sendMessage,
     retryMessage,
   }), [incidents, messages, officers, loading, error, dataSource, refresh, sendMessage, retryMessage]);
-
-  if (dataSource !== 'demo' && dataSource !== 'api') {
-    throw new Error('VITE_OPERATIONAL_DATA_SOURCE must be "demo" or "api".');
-  }
 
   return (
     <OperationalDataContext.Provider value={value}>
