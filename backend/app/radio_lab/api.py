@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.auth.api import CurrentPrincipal
+from app.auth.api import CurrentPrincipal, CurrentSender
 from app.db.models import MediaAttachment, Message
 from app.db.session import get_db_session
 from app.radio_lab.aprs.codec import APRSError, build_position, build_text
@@ -85,7 +85,7 @@ def messages(_: CurrentPrincipal, db: DBSession, settings: Settings,
 
 
 @router.post("/transmissions", status_code=202)
-def transmit(payload: TransmissionRequest, principal: CurrentPrincipal, db: DBSession, settings: Settings):
+def transmit(payload: TransmissionRequest, principal: CurrentSender, db: DBSession, settings: Settings):
     validate_packet(payload, settings)
     repository = RadioRepository(None, settings)
     message = repository.enqueue(db, principal.operator.id, payload)
@@ -93,7 +93,7 @@ def transmit(payload: TransmissionRequest, principal: CurrentPrincipal, db: DBSe
 
 
 @router.post("/transmissions/{identifier}/retry", status_code=202)
-def retry(identifier: UUID, _: CurrentPrincipal, db: DBSession, settings: Settings):
+def retry(identifier: UUID, _: CurrentSender, db: DBSession, settings: Settings):
     require_enabled(settings)
     repository = RadioRepository(None, settings)
     try:
@@ -106,7 +106,7 @@ def retry(identifier: UUID, _: CurrentPrincipal, db: DBSession, settings: Settin
 
 
 @router.post("/transmissions/{identifier}/cancel", status_code=202)
-def cancel(identifier: UUID, _: CurrentPrincipal, db: DBSession, settings: Settings):
+def cancel(identifier: UUID, _: CurrentSender, db: DBSession, settings: Settings):
     repository = RadioRepository(None, settings)
     try:
         message = repository.cancel(db, identifier)

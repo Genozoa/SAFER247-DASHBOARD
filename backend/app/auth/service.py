@@ -32,6 +32,9 @@ def register_operator(
     operator = Operator(
         username=username,
         password_hash=hash_password(password),
+        is_approved=True,
+        role="operator",
+        approved_at=datetime.now(timezone.utc),
     )
     db.add(operator)
     db.flush()
@@ -68,6 +71,8 @@ def authenticate_operator(
     password_hash = operator.password_hash if operator else None
     if not verify_password(password, password_hash) or operator is None:
         return None
+    if not operator.is_approved:
+        raise PermissionError("This account is awaiting administrator approval.")
 
     token = create_session_token()
     add_auth_session(db, operator.id, token)

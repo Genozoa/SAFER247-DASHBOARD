@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import cast, func, literal, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
-from app.auth.api import CurrentPrincipal
+from app.auth.api import CurrentPrincipal, CurrentSender
 from app.db.models import (
     Barangay,
     IncidentReport,
@@ -280,7 +280,7 @@ def list_messages(
 @router.post("/messages", response_model=MessageView, status_code=201)
 def queue_message(
     payload: QueuedMessageRequest,
-    principal: CurrentPrincipal,
+    principal: CurrentSender,
     db: DBSession,
     settings: RadioSettingsDependency,
 ) -> MessageView:

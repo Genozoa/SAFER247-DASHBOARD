@@ -38,6 +38,9 @@ class Operator(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("true")
     )
+    is_approved: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    role: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'viewer'"))
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

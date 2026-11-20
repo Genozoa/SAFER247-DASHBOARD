@@ -1,6 +1,8 @@
 import os
+import hmac
 from datetime import datetime, timezone
-from typing import Annotated
+from uuid import UUID
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field, field_validator
@@ -37,6 +39,15 @@ class Credentials(BaseModel):
         return normalized
 
 
+class RegistrationCredentials(Credentials):
+    registration_code: str = Field(min_length=1, max_length=256)
+
+
+class OperatorApproval(BaseModel):
+    approved: bool | None = None
+    role: Literal["viewer", "operator", "admin"] | None = None
+
+
 class CallSignChange(BaseModel):
     call_sign: str = Field(min_length=1, max_length=64)
 
@@ -52,6 +63,8 @@ class CallSignChange(BaseModel):
 class OperatorView(BaseModel):
     id: str
     call_sign: str
+    approved: bool
+    role: str
 
 
 class Principal:
@@ -61,7 +74,8 @@ class Principal:
 
 
 def operator_view(operator: Operator) -> OperatorView:
-    return OperatorView(id=str(operator.id), call_sign=operator.username)
+    return OperatorView(id=str(operator.id), call_sign=operator.username,
+                        approved=operator.is_approved, role=operator.role)
 
 
 def set_session_cookie(response: Response, token: str) -> None:
@@ -92,12 +106,38 @@ def current_principal(
             AuthSession.expires_at > datetime.now(timezone.utc),
         )
     )
-    if auth_session is None or not auth_session.operator.is_active:
+    if auth_session is None or not auth_session.operator.is_active or not auth_session.operator.is_approved:
         raise HTTPException(status_code=401, detail="Authentication required.")
     return Principal(auth_session.operator, auth_session)
 
 
 CurrentPrincipal = Annotated[Principal, Depends(current_principal)]
+
+
+def transmitting_principal(principal: CurrentPrincipal) -> Principal:
+    if principal.operator.role not in {"operator", "admin"}:
+        raise HTTPException(status_code=403, detail="Transmission permission required.")
+    return principal
+
+
+CurrentSender = Annotated[Principal, Depends(transmitting_principal)]
+
+
+def administrator_principal(principal: CurrentPrincipal) -> Principal:
+    if principal.operator.role != "admin":
+        raise HTTPException(status_code=403, detail="Administrator permission required.")
+    return principal
+
+
+CurrentAdmin = Annotated[Principal, Depends(administrator_principal)]
+
+
+def verify_registration_code(candidate: str) -> None:
+    expected = os.environ.get("OPERATOR_REGISTRATION_CODE", "")
+    if not expected:
+        raise HTTPException(status_code=503, detail="Operator registration is disabled.")
+    if not hmac.compare_digest(candidate.encode("utf-8"), expected.encode("utf-8")):
+        raise HTTPException(status_code=403, detail="Invalid personnel registration code.")
 
 
 def _check_password(password: str) -> None:
@@ -132,10 +172,11 @@ def _integrity_error_response(
 
 @router.post("/register", response_model=OperatorView, status_code=201)
 def register(
-    payload: Credentials,
+    payload: RegistrationCredentials,
     response: Response,
     db: DBSession,
 ) -> OperatorView:
+    verify_registration_code(payload.registration_code)
     _check_password(payload.password)
     fingerprint = password_fingerprint(payload.password)
     if db.scalar(
@@ -167,6 +208,8 @@ def login(payload: Credentials, response: Response, db: DBSession) -> OperatorVi
         result = authenticate_operator(db, payload.call_sign, payload.password)
     except PasswordConfigurationError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
+    except PermissionError as error:
+        raise HTTPException(status_code=403, detail=str(error)) from error
     if result is None:
         db.rollback()
         raise HTTPException(status_code=401, detail="Invalid call sign or password.")
@@ -224,4 +267,35 @@ def update_call_sign(
         raise HTTPException(
             status_code=409, detail="Call sign is already taken."
         ) from error
+    return operator_view(operator)
+
+
+@router.get("/operators", response_model=list[OperatorView])
+def list_operators(_: CurrentAdmin, db: DBSession) -> list[OperatorView]:
+    return [operator_view(operator) for operator in
+            db.scalars(select(Operator).order_by(Operator.username)).all()]
+
+
+@router.patch("/operators/{operator_id}", response_model=OperatorView)
+def review_operator(
+    operator_id: UUID, payload: OperatorApproval,
+    principal: CurrentAdmin, db: DBSession,
+) -> OperatorView:
+    operator = db.get(Operator, operator_id)
+    if operator is None:
+        raise HTTPException(status_code=404, detail="Operator not found.")
+    if payload.approved is None and payload.role is None:
+        raise HTTPException(status_code=422, detail="No approval or role change provided.")
+    if operator.id == principal.operator.id and (
+        payload.approved is False or (payload.role is not None and payload.role != "admin")
+    ):
+        raise HTTPException(status_code=409, detail="Administrators cannot revoke their own access.")
+    if payload.approved is not None:
+        operator.is_approved = payload.approved
+        operator.approved_at = datetime.now(timezone.utc) if payload.approved else None
+        if not payload.approved:
+            db.query(AuthSession).filter(AuthSession.operator_id == operator.id).delete()
+    if payload.role is not None:
+        operator.role = payload.role
+    db.commit()
     return operator_view(operator)
