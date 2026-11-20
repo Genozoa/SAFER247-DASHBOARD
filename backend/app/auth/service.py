@@ -32,9 +32,9 @@ def register_operator(
     operator = Operator(
         username=username,
         password_hash=hash_password(password),
-        is_approved=True,
-        role="operator",
-        approved_at=datetime.now(timezone.utc),
+        is_approved=False,
+        role="viewer",
+        approved_at=None,
     )
     db.add(operator)
     db.flush()
@@ -44,9 +44,7 @@ def register_operator(
             password_fingerprint=fingerprint,
         )
     )
-    token = create_session_token()
-    add_auth_session(db, operator.id, token)
-    return operator, token
+    return operator, None
 
 
 def add_auth_session(db: Session, operator_id: UUID, token: str) -> AuthSession:

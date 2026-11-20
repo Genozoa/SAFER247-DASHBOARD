@@ -198,7 +198,6 @@ def register(
         raise _integrity_error_response(
             db, fingerprint, payload.call_sign
         ) from error
-    set_session_cookie(response, token)
     return operator_view(operator)
 
 
