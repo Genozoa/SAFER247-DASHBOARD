@@ -9,6 +9,7 @@ from app.config import load_environment
 from app.auth.api import router as auth_router
 from app.operations.api import router as operations_router
 from app.radio_lab.api import router as radio_router
+from app.maps.api import router as maps_router
 from app.radio_lab.settings import RadioSettings
 from app.radio_lab.worker_supervisor import RadioWorkerSupervisor
 
@@ -52,6 +53,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(auth_router)
     app.include_router(operations_router)
+    app.include_router(maps_router)
     app.include_router(radio_router)
     return app
 

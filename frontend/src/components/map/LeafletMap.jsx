@@ -27,6 +27,13 @@ import { getIncidentHeatmapPoints } from '../../utils/incidentData';
 
 // Google Maps style tile configurations (clean embedded cartography)
 const TILE_LAYERS = {
+  offline: {
+    name: 'Offline',
+    icon: MapIcon,
+    description: 'Local map tiles, usable without internet when the tile pack is installed',
+    url: '/api/maps/tiles/{z}/{x}/{y}.png',
+    options: { maxZoom: 18, attribution: 'Locally provisioned offline tiles' },
+  },
   default: {
     name: 'Default',
     icon: MapIcon,
@@ -96,7 +103,7 @@ export default function LeafletMap({
   const skipNextFlyToRef = useRef(false);
 
   // Map settings and feature toggles
-  const [mapType, setMapType] = useState('default'); // 'default' | 'satellite' | 'terrain'
+  const [mapType, setMapType] = useState('offline'); // offline when provisioned; optional online layers
   const [showMunicipalBorder, setShowMunicipalBorder] = useState(true);
   const [showBarangayPolygons, setShowBarangayPolygons] = useState(true);
   const [kdeRadius, setKdeRadius] = useState(36);
@@ -215,7 +222,7 @@ export default function LeafletMap({
     });
 
     // Add Base Tile Layer with offline detection
-    const baseLayer = createBaseTileLayer('default', map);
+    const baseLayer = createBaseTileLayer('offline', map);
     baseTileLayerRef.current = baseLayer;
 
     // Initialize Layer Groups in proper z-order
