@@ -123,6 +123,15 @@ def transmitting_principal(principal: CurrentPrincipal) -> Principal:
 CurrentSender = Annotated[Principal, Depends(transmitting_principal)]
 
 
+def radio_viewing_principal(principal: CurrentPrincipal) -> Principal:
+    if principal.operator.username == "Demo":
+        raise HTTPException(status_code=403, detail="Demo accounts cannot access live radio data.")
+    return principal
+
+
+CurrentRadioViewer = Annotated[Principal, Depends(radio_viewing_principal)]
+
+
 def administrator_principal(principal: CurrentPrincipal) -> Principal:
     if principal.operator.role != "admin":
         raise HTTPException(status_code=403, detail="Administrator permission required.")
@@ -250,6 +259,8 @@ def update_call_sign(
     db: DBSession,
 ) -> OperatorView:
     operator = principal.operator
+    if operator.username == "Demo":
+        raise HTTPException(status_code=403, detail="Demo identity is fixed.")
     other_operator = db.scalar(
         select(Operator.id).where(
             Operator.username == payload.call_sign,

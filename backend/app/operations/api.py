@@ -395,8 +395,10 @@ class ResponderTrackView(BaseModel):
 
 
 @router.get("/responders/locations", response_model=list[ResponderTrackView])
-def responder_locations(_: CurrentPrincipal, db: DBSession) -> list[ResponderTrackView]:
+def responder_locations(principal: CurrentPrincipal, db: DBSession) -> list[ResponderTrackView]:
     """Return recent radio-derived positions only; APRS does not authenticate sender identity."""
+    if principal.operator.username == "Demo":
+        return []
     latitude, longitude = _point_coordinates(db, ResponderLocation.location)
     cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
     rows = db.execute(

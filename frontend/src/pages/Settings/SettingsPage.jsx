@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertCircle } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
+import { authRequest } from '../../auth/authApi.js';
 import LogoutControl from '../../components/common/LogoutControl';
 import { useOperationalData } from '../../data/OperationalDataContext';
 import { createRadioClient } from '../../../../backend/app/radio_lab/frontend/client.js';
@@ -43,6 +44,11 @@ function receiverBadgeState(worker, requestError) {
 export default function SettingsPage() {
   const { operator, updateCallSign, logout } = useAuth();
   const { dataSource } = useOperationalData();
+  const isDemo = operator.call_sign === 'Demo';
+  const [accounts, setAccounts] = useState([]);
+  const [adminError, setAdminError] = useState('');
+  const [adminBusy, setAdminBusy] = useState(false);
+  const [rolesDraft, setRolesDraft] = useState({});
   const [callSign, setCallSign] = useState(operator.call_sign);
   const [profileMessage, setProfileMessage] = useState('');
   const [profileError, setProfileError] = useState('');
@@ -65,7 +71,7 @@ export default function SettingsPage() {
   ].filter(Boolean);
 
   useEffect(() => {
-    if (dataSource !== 'api') {
+    if (dataSource !== 'api' || isDemo) {
       setRadioStatus(null);
       setRadioStatusError('');
       return undefined;
@@ -96,7 +102,32 @@ export default function SettingsPage() {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [dataSource]);
+  }, [dataSource, isDemo]);
+
+  useEffect(() => {
+    if (operator.role !== 'admin') return;
+    let active = true;
+    authRequest(import.meta.env.VITE_API_BASE_URL || '/api', '/auth/operators')
+      .then((result) => { if (active) setAccounts(result); })
+      .catch((error) => { if (active) setAdminError(error.message); });
+    return () => { active = false; };
+  }, [operator.role]);
+
+  async function updateOperatorAccount(account, changes) {
+    setAdminBusy(true);
+    setAdminError('');
+    try {
+      const updated = await authRequest(import.meta.env.VITE_API_BASE_URL || '/api',
+        `/auth/operators/${encodeURIComponent(account.id)}`, {
+          method: 'PATCH', body: changes,
+        });
+      setAccounts((current) => current.map((item) => item.id === updated.id ? updated : item));
+    } catch (error) {
+      setAdminError(error.message);
+    } finally {
+      setAdminBusy(false);
+    }
+  }
 
   function handleCallSignSubmit(event) {
     event.preventDefault();
@@ -256,6 +287,43 @@ export default function SettingsPage() {
           </button>
         </form>
       </div>
+
+      {operator.role === 'admin' && (
+        <div className="settings-card">
+          <div className="settings-card-header">
+            <h3>Personnel access approvals</h3>
+            <p>Approve verified LDRRMO staff and manage account privileges.</p>
+          </div>
+          <div className="settings-card-body">
+            {adminError && <p className="auth-alert" role="alert">{adminError}</p>}
+            {accounts.map((account) => (
+              <div key={account.id} className="settings-row">
+                <div className="settings-row-label">
+                  <strong>{account.call_sign}</strong>
+                  <span> {account.approved ? 'Approved' : 'Awaiting approval'}</span>
+                </div>
+                <div className="settings-row-value">
+                  <select aria-label={`Role for ${account.call_sign}`}
+                    value={rolesDraft[account.id] || account.role}
+                    onChange={(event) => setRolesDraft((previous) => ({ ...previous, [account.id]: event.target.value }))}>
+                    <option value="viewer">Viewer</option>
+                    <option value="operator">Operator</option>
+                    <option value="admin">Administrator</option>
+                  </select>
+                  <button type="button" className="settings-save-btn" disabled={adminBusy}
+                    onClick={() => updateOperatorAccount(account, { role: rolesDraft[account.id] || account.role })}>
+                    Save role
+                  </button>
+                  <button type="button" className="settings-save-btn" disabled={adminBusy || account.id === operator.id}
+                    onClick={() => updateOperatorAccount(account, { approved: !account.approved })}>
+                    {account.approved ? 'Revoke access' : 'Approve account'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Session */}
       <div className="settings-card">
