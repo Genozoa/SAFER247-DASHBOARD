@@ -392,29 +392,6 @@ class RadioRepository:
         set_radio_data(source_message, envelope_data)
         db.flush()
 
-    def _pair_pending_incident_image(self, db, station, identifier):
-        """Pair an image only with one unique, recent pending report for its station."""
-        cutoff = datetime.fromtimestamp(datetime.now().timestamp() - 15 * 60, tz=timezone.utc)
-        statement = select(IncidentReport).where(
-            IncidentReport.status == "pending_image",
-            IncidentReport.reported_at >= cutoff,
-        ).order_by(IncidentReport.reported_at.desc()).with_for_update()
-        if station != "SSTV-UNKNOWN":
-            responder = db.scalar(select(Responder).where(Responder.call_sign == station))
-            if responder is None:
-                return
-            statement = statement.where(IncidentReport.responder_id == responder.id)
-        reports = db.scalars(statement).all()
-        if len(reports) != 1:
-            return
-        report = reports[0]
-        attachment = db.scalar(select(MediaAttachment).where(MediaAttachment.message_id == identifier))
-        if attachment is None:
-            return
-        attachment.incident_report_id = report.id
-        report.status = "complete"
-        report.updated_at = now()
-
     def receive(self, result):
         """Persist only successfully decoded content, without inventing incident metadata."""
         kind = result["kind"]
@@ -489,7 +466,7 @@ class RadioRepository:
                                             enhancement_parameters=result.get("enhancement_parameters", {"method": "classical"}),
                                             enhanced_at=now()))
                     db.flush()
-                self._pair_pending_incident_image(db, station, identifier)
+                # SSTV carries no trustworthy sender or report ID. Leave unattached until explicitly reviewed.
         return str(identifier)
 
     @staticmethod

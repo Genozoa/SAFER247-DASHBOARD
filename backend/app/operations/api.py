@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -311,3 +311,63 @@ def queue_message(
         radio_backed=True,
         data_source="database",
     )
+
+
+class ImageCorrelationRequest(BaseModel):
+    report_code: str = Field(min_length=8, max_length=64)
+    confirm: bool
+    verification_notes: str = Field(min_length=12, max_length=1000)
+
+
+@router.post("/images/{attachment_id}/correlate", status_code=200)
+def correlate_image(
+    attachment_id: str,
+    payload: ImageCorrelationRequest,
+    principal: CurrentSender,
+    db: DBSession,
+):
+    """Require explicit human verification; SSTV contains no inherent report identity."""
+    from uuid import UUID
+    try:
+        attachment_uuid = UUID(attachment_id)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail="Invalid attachment ID.") from error
+    if payload.confirm is not True:
+        raise HTTPException(status_code=422, detail="Explicit confirmation is required.")
+    attachment = db.scalar(
+        select(MediaAttachment).where(MediaAttachment.id == attachment_uuid).with_for_update()
+    )
+    report = db.scalar(
+        select(IncidentReport).where(IncidentReport.report_code == payload.report_code).with_for_update()
+    )
+    if attachment is None or report is None:
+        raise HTTPException(status_code=404, detail="Image or incident was not found.")
+    if attachment.incident_report_id is not None:
+        raise HTTPException(status_code=409, detail="This image is already linked to an incident.")
+    if attachment.message_id is None:
+        raise HTTPException(status_code=422, detail="Only received radio images are eligible.")
+    received = db.get(Message, attachment.message_id)
+    if received is None or received.direction != "incoming" or (
+        (received.decoded_payload or {}).get("radio_lab", {}).get("kind") != "image"
+    ):
+        raise HTTPException(status_code=422, detail="Attachment is not a decoded SSTV image.")
+    if report.status != "pending_image":
+        raise HTTPException(status_code=409, detail="Report is not awaiting an image.")
+    attachment.incident_report_id = report.id
+    attachment.linked_by_operator_id = principal.operator.id
+    attachment.linked_at = datetime.now(timezone.utc)
+    report.status = "complete"
+    report.updated_at = datetime.now(timezone.utc)
+    # Notes are a human assertion, never proof of RF origin.
+    radio = dict((received.decoded_payload or {}).get("radio_lab", {}))
+    radio["manual_correlation"] = {
+        "report_code": payload.report_code,
+        "operator_id": str(principal.operator.id),
+        "notes": payload.verification_notes,
+        "verified_at": attachment.linked_at.isoformat(),
+        "proof": "human_review_unverified_origin",
+    }
+    received.decoded_payload = {**(received.decoded_payload or {}), "radio_lab": radio}
+    db.commit()
+    return {"reportCode": report.report_code, "attachmentId": str(attachment.id),
+            "linkedBy": str(principal.operator.id), "verification": "manual_review"}
