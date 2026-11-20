@@ -46,6 +46,7 @@ export function OperationalDataProvider({ children, operator }) {
   const [incidents, setIncidents] = useState(
     dataSource === 'demo' ? DEMO_INCIDENTS : [],
   );
+  const [officers, setOfficers] = useState([]);
   const [messages, setMessages] = useState(
     dataSource === 'demo' ? DEMO_MESSAGES : [],
   );
@@ -57,12 +58,14 @@ export function OperationalDataProvider({ children, operator }) {
     if (!silent) setLoading(true);
     setError('');
     try {
-      const [incidentRecords, messageRecords] = await Promise.all([
+      const [incidentRecords, messageRecords, officerRecords] = await Promise.all([
         request('/operations/incidents'),
         request('/operations/messages'),
+        request('/operations/responders/locations'),
       ]);
       setIncidents(incidentRecords);
       setMessages(messageRecords);
+      setOfficers(officerRecords);
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -116,13 +119,14 @@ export function OperationalDataProvider({ children, operator }) {
   const value = useMemo(() => ({
     incidents,
     messages,
+    officers,
     loading,
     error,
     dataSource,
     refresh,
     sendMessage,
     retryMessage,
-  }), [incidents, messages, loading, error, dataSource, refresh, sendMessage, retryMessage]);
+  }), [incidents, messages, officers, loading, error, dataSource, refresh, sendMessage, retryMessage]);
 
   if (dataSource !== 'demo' && dataSource !== 'api') {
     throw new Error('VITE_OPERATIONAL_DATA_SOURCE must be "demo" or "api".');

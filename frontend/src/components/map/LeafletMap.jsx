@@ -65,6 +65,10 @@ const TILE_LAYERS = {
   },
 };
 
+const escapeMapLabel = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+}[character]));
+
 export default function LeafletMap({
   mode = 'Markers',
   incidents = [],
@@ -640,13 +644,13 @@ export default function LeafletMap({
           trailsLayer.addLayer(polyline);
         }
 
-        // Live DRRMO Officer Pin
+        // APRS-derived responder pin, not authenticated by RF
         const officerIcon = L.divIcon({
           className: 'officer-leaflet-marker',
           html: `
             <div class="officer-pin-box ${isSelected ? 'selected' : ''}">
               <div class="officer-pulse-ring"></div>
-              <div class="officer-badge">${officer.name || 'DRRMO Officer'}</div>
+              <div class="officer-badge">${escapeMapLabel(officer.name || 'Responder')}</div>
               <div class="officer-dot"><span class="officer-dot-center"></span></div>
             </div>
           `,
@@ -659,7 +663,7 @@ export default function LeafletMap({
         marker.bindPopup(`
           <div style="padding: 10px; font-size: 12px; line-height: 1.4;">
             <strong style="color: #0284c7;">${officer.name || 'DRRMO Officer'}</strong><br/>
-            <span style="color: #64748b;">${officer.unit || 'Field Responder'} • ${officer.barangay || 'San Fernando'}</span>
+            <span style="color: #64748b;">${escapeMapLabel(officer.unit || 'Field Responder')} • ${escapeMapLabel(officer.barangay || 'San Fernando')}</span>
           </div>
         `);
 
@@ -929,7 +933,7 @@ export default function LeafletMap({
           {officers.length > 0 && (
             <>
               <span>•</span>
-              <span>{officers.length} Live Officers</span>
+              <span>{officers.length} Recent Responders</span>
             </>
           )}
         </div>

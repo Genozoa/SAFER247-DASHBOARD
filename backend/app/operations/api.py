@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -16,6 +16,7 @@ from app.db.models import (
     Message,
     Operator,
     Responder,
+    ResponderLocation,
 )
 from app.db.session import get_db_session
 from app.radio_lab.api import get_radio_settings
@@ -371,3 +372,43 @@ def correlate_image(
     db.commit()
     return {"reportCode": report.report_code, "attachmentId": str(attachment.id),
             "linkedBy": str(principal.operator.id), "verification": "manual_review"}
+
+
+class ResponderTrackView(BaseModel):
+    id: str
+    name: str
+    unit: str
+    lat: float
+    lng: float
+    lastSeen: datetime
+    trail: list[list[float]]
+    source: str = "unverified_aprs_radio"
+
+
+@router.get("/responders/locations", response_model=list[ResponderTrackView])
+def responder_locations(_: CurrentPrincipal, db: DBSession) -> list[ResponderTrackView]:
+    """Return recent radio-derived positions only; APRS does not authenticate sender identity."""
+    latitude, longitude = _point_coordinates(db, ResponderLocation.location)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    rows = db.execute(
+        select(Responder, ResponderLocation, latitude, longitude)
+        .join(ResponderLocation, ResponderLocation.responder_id == Responder.id)
+        .where(Responder.is_active.is_(True), ResponderLocation.recorded_at >= cutoff)
+        .order_by(ResponderLocation.recorded_at.desc(), ResponderLocation.id.desc())
+        .limit(2000)
+    ).all()
+    tracks = {}
+    for responder, position, lat, lng in rows:
+        if lat is None or lng is None or not (-90 <= lat <= 90 and -180 <= lng <= 180):
+            continue
+        key = str(responder.id)
+        if key not in tracks:
+            tracks[key] = {"id": key, "name": responder.display_name or responder.call_sign,
+                           "unit": responder.call_sign, "lat": lat, "lng": lng,
+                           "lastSeen": position.recorded_at, "trail": [],
+                           "source": "unverified_aprs_radio"}
+        if len(tracks[key]["trail"]) < 25:
+            tracks[key]["trail"].append([lat, lng])
+    for track in tracks.values():
+        track["trail"].reverse()
+    return [ResponderTrackView(**track) for track in tracks.values()]
