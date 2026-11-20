@@ -1,0 +1,4 @@
+# Install from backend with Python 3.11+. Headless decoder setup is in README.md.
+-r ../../requirements.txt
+-r aprs/requirements.txt
+-r sstv/requirements.txt

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" role="img" aria-labelledby="title description">
+  <title id="title">Fictional demo landslide illustration</title>
+  <desc id="description">An illustrated hillside and road with sample debris, marked as demo data.</desc>
+  <rect width="640" height="360" fill="#eaf4fb"/>
+  <rect y="244" width="640" height="116" fill="#cbd5b3"/>
+  <path d="M0 248 122 152l84 39 100-127 125 89 92-47 117 100v120H0z" fill="#78926b"/>
+  <path d="m248 173 58-109 52 38-42 77 63 65-48 18z" fill="#a88b67"/>
+  <path d="M0 308c130-48 212-39 319 0s198 43 321-2v54H0z" fill="#475569"/>
+  <path d="M0 330c136-43 214-34 319 0s196 38 321 0" fill="none" stroke="#f8fafc" stroke-width="7" stroke-dasharray="24 20"/>
+  <g fill="#806b56">
+    <path d="m271 245 22-18 17 20-25 12z"/>
+    <path d="m327 255 18-19 21 16-17 18z"/>
+    <path d="m380 261 23-16 19 21-23 13z"/>
+  </g>
+  <rect x="22" y="22" width="238" height="42" rx="8" fill="#365314"/>
+  <text x="40" y="50" fill="#fff" font-family="Arial, sans-serif" font-size="20" font-weight="700">DEMO - FICTIONAL SCENE</text>
+</svg>

@@ -1,0 +1,323 @@
+SAFER 247 - BEGINNER SETUP AND RUN GUIDE (WINDOWS)
+=================================================
+
+This guide covers starting the local SAFER 247 frontend and backend, connecting
+them to PostgreSQL/PostGIS, updating an existing database, and optionally
+creating a demo operator.
+
+IMPORTANT: Keep this guide free of real passwords and private keys. The root
+.env file is private local configuration and must never be shared or committed.
+The demo password visible in the editor selection should be treated as exposed:
+if it is real or has been used elsewhere, stop using it and choose a new,
+unique password. Changing DEMO_OPERATOR_PASSWORD in .env does NOT change the
+password of an account that has already been created. There is not currently a
+password-change/reset screen in this application.
+
+
+1. WHAT YOU NEED
+---------------
+
+- Windows and PowerShell (the VS Code integrated terminal is fine).
+- Python installed and available as the "py" command.
+- Node.js and npm installed.
+- PostgreSQL installed and running.
+- PostGIS installed for the PostgreSQL version you use.
+- A PostgreSQL database for SAFER 247 (example name: safer247_db).
+
+The project folder for the commands below is:
+
+D:\IT\CAPSTONE\Versions\V10 - Nov 16
+
+Open that folder in VS Code before following the steps.
+
+
+2. MAKE YOUR PRIVATE .ENV FILE
+------------------------------
+
+The application reads configuration from a file named .env in the project
+root. If .env already exists, edit it instead of overwriting it. If it does
+not exist, create a new plain-text file named exactly ".env" in the project
+root (not inside backend or frontend).
+
+Use these lines as a template. Replace every placeholder in angle brackets;
+do not type the angle brackets themselves:
+
+DATABASE_URL=postgresql+psycopg://<POSTGRES_USER>:<POSTGRES_PASSWORD>@localhost:5432/safer247_db
+PASSWORD_FINGERPRINT_SECRET=<PASTE_A_NEW_RANDOM_SECRET_HERE>
+APP_ENV=development
+APP_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+DEMO_OPERATOR_CALL_SIGN=<YOUR_DEMO_CALL_SIGN>
+DEMO_OPERATOR_PASSWORD=<YOUR_NEW_UNIQUE_DEMO_PASSWORD>
+
+DATABASE_URL tells the backend and database migration program which database
+server, port, and database to connect to. For a local PostgreSQL installation,
+"localhost:5432" is common. Replace the username, password, and database name
+with the values you set in PostgreSQL/pgAdmin.
+
+If a PostgreSQL password contains URL-reserved characters such as @, :, /, #,
+or %, encode those characters in DATABASE_URL. For example, @ becomes %40.
+Never put quotes around a value in the .env file.
+
+Generate a private fingerprint secret using PowerShell:
+
+    py -c "import secrets; print(secrets.token_urlsafe(48))"
+
+Copy the printed value after PASSWORD_FINGERPRINT_SECRET=. Keep it private and
+stable. Do not regenerate it after accounts have been created: the backend
+uses this key to check whether a password has already been used.
+
+Choose a demo password that is unique and meets all of these rules:
+- At least 8 characters.
+- At least one uppercase letter.
+- At least one lowercase letter.
+- At least one number.
+- At least one special character.
+
+The .env file is ignored by Git. Never paste its contents into chat, screenshots,
+source files, or this guide.
+
+
+3. CREATE OR CHECK THE POSTGRESQL DATABASE
+------------------------------------------
+
+If the database does not exist yet:
+
+1. Open pgAdmin and connect to your PostgreSQL server.
+2. Right-click "Databases" and choose "Create" > "Database".
+3. Enter safer247_db (or the name you put in DATABASE_URL), then save.
+4. Select that database, open "Tools" > "Query Tool", and run:
+
+       CREATE EXTENSION IF NOT EXISTS postgis;
+
+The database user in DATABASE_URL must have permission to create tables and
+indexes. If it cannot enable PostGIS, ask the database administrator to enable
+the extension for this database.
+
+
+4. INSTALL BACKEND PYTHON PACKAGES (FIRST TIME ONLY)
+----------------------------------------------------
+
+Open a VS Code terminal. Run:
+
+    Set-Location "D:\IT\CAPSTONE\Versions\V10 - Nov 16\backend"
+    py -m venv .venv
+    .\.venv\Scripts\Activate.ps1
+    python -m pip install -r requirements.txt
+
+If PowerShell says script execution is disabled, run this once in that
+terminal, then activate the environment again:
+
+    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+    .\.venv\Scripts\Activate.ps1
+
+The word "(.venv)" should appear near the beginning of the terminal prompt
+after activation. You need to activate the environment again in any new
+backend terminal.
+
+
+5. UPDATE THE DATABASE SCHEMA SAFELY
+------------------------------------
+
+Do not run schema.sql over an existing populated database to update it. Use
+Alembic migrations; they know which revision has already been applied.
+
+Before upgrading an existing database, make a backup in pgAdmin:
+right-click the database > "Backup".
+
+In the backend terminal, set DATABASE_URL for this PowerShell terminal. Use
+the same connection details as the DATABASE_URL line in .env:
+
+    $env:DATABASE_URL = "postgresql+psycopg://<POSTGRES_USER>:<POSTGRES_PASSWORD>@localhost:5432/safer247_db"
+
+Then check the recorded migration version:
+
+    python -m alembic -c alembic.ini current
+
+Apply all pending migrations:
+
+    python -m alembic -c alembic.ini upgrade head
+
+The current latest project revision is 0002_auth_sessions. If the old database
+is at 0001_initial_schema, this migration adds the authentication tables.
+Existing operator records are not deleted.
+
+In pgAdmin, refresh the database's Tables list. You can check the version with:
+
+    SELECT version_num FROM alembic_version;
+
+You can check that the authentication tables exist with:
+
+    SELECT table_name
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name IN ('operator_auth', 'auth_sessions');
+
+Expected version: 0002_auth_sessions. Expected tables: operator_auth and
+auth_sessions.
+
+If alembic_version does not exist, or it says 0002_auth_sessions while one or
+both auth tables are missing, stop. Do not run "alembic stamp head", drop
+tables, or manually change the version: those actions can hide a mismatched
+schema rather than fix it. Back up the database and investigate first.
+
+Alembic does not automatically read .env in its command. That is why the
+$env:DATABASE_URL command above is needed before running Alembic. It applies
+only to the current PowerShell terminal.
+
+
+6. (OPTIONAL) CREATE A DEMO OPERATOR
+------------------------------------
+
+In the root .env file, set DEMO_OPERATOR_CALL_SIGN and DEMO_OPERATOR_PASSWORD
+to the call sign and new unique password you chose.
+
+In a backend terminal where the virtual environment is activated, make sure
+you are in the backend folder, then run:
+
+    python -m app.auth.seed_demo --confirm-demo-seed
+
+The program creates the demo account once. Running it again with the same
+values reports that the account already exists; it does not change the
+password. It will refuse to run when APP_ENV=production.
+
+If you change DEMO_OPERATOR_PASSWORD after the account exists, the account in
+the database keeps its old password. Do not delete a populated operator row to
+try to reset it: operator records may be linked to reports, messages, or
+other records. The project currently has no password-reset screen, so use a
+fresh demo account in a safe development database or ask a developer to add a
+safe password-change process before rotating an in-use account.
+
+
+7. START THE BACKEND API
+------------------------
+
+Use a backend terminal:
+
+    Set-Location "D:\IT\CAPSTONE\Versions\V10 - Nov 16\backend"
+    .\.venv\Scripts\Activate.ps1
+    python -m uvicorn app.main:app --reload --port 8000
+
+Leave this terminal open while using the app. A successful start says the
+server is running at http://127.0.0.1:8000. The backend loads the root .env
+file when it starts.
+
+
+8. START THE FRONTEND
+---------------------
+
+Open a second VS Code terminal in the frontend folder:
+
+    Set-Location "D:\IT\CAPSTONE\Versions\V10 - Nov 16\frontend"
+    npm install
+
+For a frontend-only dashboard preview with demo data, run:
+
+    npm run dev
+
+Leave this terminal open too. Open this address in your browser:
+
+    http://localhost:3000
+
+To load operational records from PostgreSQL through the backend, set the
+frontend data source before starting Vite. Stop the preview server with
+Ctrl+C first:
+
+    $env:VITE_OPERATIONAL_DATA_SOURCE = "api"
+    npm run dev
+
+In API mode, Vite forwards /api requests to the backend at
+http://127.0.0.1:8000.
+The backend and database must be running, and the operator must sign in through
+the API. If the operational tables contain no records, the dashboard and
+messaging list will be empty. Composed messages are saved with `queued` status;
+this does not transmit them over radio. To return to the offline preview in
+that terminal, run:
+
+    Remove-Item Env:VITE_OPERATIONAL_DATA_SOURCE -ErrorAction SilentlyContinue
+
+
+9. SIGN IN OR REGISTER
+---------------------
+
+- Offline preview signs in automatically as `Offline Demo`; its changes are
+  not saved.
+- In API mode, sign in to a seeded demo account using the call sign and
+  password from `.env`.
+- To register another operator, choose Register and enter a call sign and
+  password.
+- Use a password meeting all five password rules from section 2.
+- An existing password cannot be reused by another operator.
+- A signed-in operator can update their own call sign from My Account.
+- Use the sidebar's Sign Out action to end a session.
+
+
+10. STOPPING AND RESTARTING
+---------------------------
+
+To stop either server, click in its terminal and press Ctrl+C.
+
+Next time, open two terminals:
+
+Backend terminal:
+
+    Set-Location "D:\IT\CAPSTONE\Versions\V10 - Nov 16\backend"
+    .\.venv\Scripts\Activate.ps1
+    python -m uvicorn app.main:app --reload --port 8000
+
+Frontend terminal:
+
+    Set-Location "D:\IT\CAPSTONE\Versions\V10 - Nov 16\frontend"
+    npm run dev
+
+Run database migrations again only after you install code containing a new
+migration. "upgrade head" is safe to rerun: Alembic skips migrations already
+recorded as applied.
+
+
+11. COMMON PROBLEMS
+-------------------
+
+"DATABASE_URL is not set" while running Alembic:
+Set $env:DATABASE_URL in that same PowerShell terminal, as shown in section 5.
+
+"Connection refused":
+Check that PostgreSQL is running, the port is correct (commonly 5432), and
+the host/database/user/password in DATABASE_URL are correct.
+
+"Password authentication failed":
+The PostgreSQL username or password in DATABASE_URL is incorrect. This is the
+database password, not the SAFER 247 operator password.
+
+"PostGIS extension is not available" or permission denied:
+Install PostGIS for your PostgreSQL version or ask the database administrator
+to enable it and grant the necessary permissions.
+
+"No module named ...":
+Activate the backend .venv and run:
+
+    python -m pip install -r requirements.txt
+
+"Address already in use":
+Another process may already be using port 8000 or 3000. Stop the other server
+with Ctrl+C, or ask for help before changing configured ports.
+
+The frontend loads but sign-in says the API is unavailable:
+Check that the backend terminal is still running at port 8000 and that the
+frontend terminal is still running at port 3000.
+
+
+12. TESTS
+--------
+
+Backend tests, from the backend folder with .venv activated:
+
+    python -m pytest
+
+Frontend tests, from the frontend folder:
+
+    npm test
+
+Production frontend build:
+
+    npm run build
+

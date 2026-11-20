@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" role="img" aria-labelledby="title description">
+  <title id="title">Fictional demo first-aid illustration</title>
+  <desc id="description">An illustrated first-aid kit, marked as demo data.</desc>
+  <rect width="640" height="360" fill="#eef6f2"/>
+  <circle cx="320" cy="188" r="132" fill="#d7eee3"/>
+  <rect x="208" y="135" width="224" height="150" rx="22" fill="#fff" stroke="#15803d" stroke-width="10"/>
+  <path d="M270 135v-30c0-20 16-36 36-36h28c20 0 36 16 36 36v30" fill="none" stroke="#15803d" stroke-width="12"/>
+  <rect x="296" y="167" width="48" height="88" rx="7" fill="#dc2626"/>
+  <rect x="276" y="187" width="88" height="48" rx="7" fill="#dc2626"/>
+  <rect x="22" y="22" width="238" height="42" rx="8" fill="#166534"/>
+  <text x="40" y="50" fill="#fff" font-family="Arial, sans-serif" font-size="20" font-weight="700">DEMO - FICTIONAL SCENE</text>
+</svg>

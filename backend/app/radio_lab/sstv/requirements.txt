@@ -1,0 +1,5 @@
+# Python >=3.11. Runtime dependencies are for PD90 reception only.
+Pillow==11.3.0
+numpy==2.3.5
+scipy==1.17.0
+sounddevice>=0.5.0,<1.0

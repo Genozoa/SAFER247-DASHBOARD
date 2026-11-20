@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet"><style>body{margin:0;background:#E8E8E4;font-family:Archivo,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}a{color:oklch(0.48 0.16 250);text-decoration:none}a:hover{color:oklch(0.38 0.16 250)}</style></helmet>
+
+<div style="padding:44px 44px 8px;max-width:1180px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#6B6B64;margin-bottom:14px">SAFER 247 · RESPONDER ANDROID APP · IA + SCREEN STRUCTURE REVIEW</div>
+<h1 style="font:700 34px/1.15 Archivo;margin:0 0 14px;color:#141412;max-width:740px;text-wrap:pretty">Three competing navigation structures, each built against one compact 360×640 screen.</h1>
+<p style="font:400 15px/1.55 Archivo;color:#3C3C36;margin:0 0 26px;max-width:680px;text-wrap:pretty">Below: my reading of the context doc, the assumptions I need you to confirm or correct, and three full IA directions with three screens each. Pick a direction (or mix parts) and I'll build out the remaining screens — search/filter, call sign, beaconing detail — inside it.</p>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px;margin-bottom:30px">
+<div style="background:#fff;border:1px solid rgba(0,0,0,.10);border-radius:8px;padding:20px 22px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#6B6B64;margin-bottom:12px">WHAT THE SETTING DICTATES</div>
+<div style="font:400 13.5px/1.6 Archivo;color:#3C3C36;text-wrap:pretty">Gloves, rain, noon sun, night, battery scarcity, 360×640 dp. So: <strong style="font-weight:600;color:#141412">words instead of icons</strong> (an icon under stress is a guess), 56–64 dp minimum targets, one primary action per screen, metadata in monospace so call signs and coordinates are read as data — never a dense card. Light ground is the default because sunlight legibility beats night legibility in frequency; <a href="#1c">1c</a> shows the night treatment.</div>
+</div>
+<div style="background:#fff;border:1px solid rgba(0,0,0,.10);border-radius:8px;padding:20px 22px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#6B6B64;margin-bottom:12px">THE STATUS PROBLEM</div>
+<div style="font:400 13.5px/1.6 Archivo;color:#3C3C36;text-wrap:pretty">Four system states compete for space: radio link, background listening, beaconing, and per-message transmit status. My rule — the first three collapse into <strong style="font-weight:600;color:#141412">one line of system truth</strong> directly under the app bar, in the same place on every screen; per-message status stays on the message, never duplicated in a banner. Beaconing is the only state allowed to shout, because it is the only one that costs you incoming messages.</div>
+</div>
+<div style="background:#fff;border:1px solid rgba(0,0,0,.10);border-radius:8px;padding:20px 22px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#6B6B64;margin-bottom:12px">WHAT I DE-EMPHASIZED, ON PURPOSE</div>
+<div style="font:400 13.5px/1.6 Archivo;color:#3C3C36;text-wrap:pretty"><strong style="font-weight:600;color:#141412">Search and filter</strong> are not on the feed — they live behind one word in the app bar. Scanning the last ten messages is the real field task; searching is a base-camp task. <strong style="font-weight:600;color:#141412">Coordinates</strong> are one quiet mono line, not a hero, since with no map they are only read aloud over voice. <strong style="font-weight:600;color:#141412">Call sign editing</strong> is buried one level into Setup — it is set once, and a mis-tap there corrupts your identity on every future broadcast.</div>
+</div>
+</div>
+
+<div style="background:#141412;border-radius:8px;padding:22px 24px;margin-bottom:8px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#A8A89E;margin-bottom:14px">ASSUMPTIONS — PLEASE CONFIRM OR CORRECT</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px 26px;font:400 13px/1.55 Archivo;color:#E4E4DE">
+<div><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:oklch(0.72 0.14 85)">A1</span> &nbsp;The responder reads far more than they send. Receiving is the app's resting state, so every direction opens on traffic or one tap from it.</div>
+<div><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:oklch(0.72 0.14 85)">A2</span> &nbsp;A quick message is usually 3–10 words, typed one-handed. The composer is a single field, not a form.</div>
+<div><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:oklch(0.72 0.14 85)">A3</span> &nbsp;Four incident types is the whole list, so type selection can be four big tiles rather than a dropdown.</div>
+<div><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:oklch(0.72 0.14 85)">A4</span> &nbsp;An image at 1–3 minutes of channel time is a deliberate, rare decision — so attaching one always shows its cost in time, and never auto-sends.</div>
+<div><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:oklch(0.72 0.14 85)">A5</span> &nbsp;Retransmit is normal behaviour, not error recovery. It sits on every sent message at equal weight, and needs no explanation copy.</div>
+<div><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:oklch(0.72 0.14 85)">A6</span> &nbsp;The phone lives in a pocket or mount with the screen off. Notifications, not the feed, are how a new message is actually noticed.</div>
+</div>
+</div>
+</div>
+
+<section style="padding:36px 44px 40px;border-bottom:1px solid rgba(0,0,0,.10)" id="t2">
+<div style="display:flex;align-items:baseline;gap:10px;margin:0 0 24px">
+<a style="font:600 10px/1 'IBM Plex Mono',monospace;padding:4px 8px;background:#141412;color:#fff;border-radius:4px" href="#t2">2</a>
+<span style="font:600 13px/1.2 Archivo;color:#141412"><a href="#1b">1b</a> built out on <a href="#1a">1a</a>'s single feed, keeping <a href="#1b">1b</a>'s two docked compose buttons — twelve screens</span>
+</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:34px;align-items:flex-start">
+<div style="flex:none;display:flex;flex-direction:column;gap:10px;scroll-margin-top:16px" id="2a">
+<div style="display:flex;align-items:baseline;gap:9px;font:400 11px/1.3 Archivo;color:rgba(0,0,0,.55)"><a style="font:600 10.5px/1 'IBM Plex Mono',monospace;padding:4px 8px;background:rgba(0,0,0,.08);color:#141412;border-radius:5px" href="#2a">2a</a>The build-out — one feed with ALL / REPORTS, two compose buttons always docked, three destinations</div>
+<div style="background:#fff;border:1px solid rgba(0,0,0,.10);border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:32px 34px 34px;width:1620px;max-width:100%">
+
+<div style="display:flex;gap:30px;align-items:flex-start;margin-bottom:32px">
+<div style="flex:1;min-width:0">
+<h2 style="font:700 26px/1.18 Archivo;margin:0 0 12px;color:#141412">One stream, two densities, two send buttons</h2>
+<p style="font:400 14.5px/1.6 Archivo;color:#3C3C36;margin:0 0 12px;max-width:640px;text-wrap:pretty">The channel is one thing, so the feed is one screen and one scroll — that is <a href="#1a">1a</a>. Within it, chatter compresses to a single line and reports open into cards: the separation the requirements ask for is carried by <em>density and form</em>, not by a second destination. REPORTS is a filter of that same scroll, so nothing you can see in it is hidden from ALL.</p>
+<p style="font:400 14.5px/1.6 Archivo;color:#3C3C36;margin:0;max-width:640px;text-wrap:pretty">Compose stays as <a href="#1b">1b</a> had it: a docked bar with QUICK MESSAGE at full width and REPORT beside it. No floating pill, no intermediate "what kind of message?" step, both entries permanently visible and thumb-reachable.</p>
+</div>
+<sc-if value="{{ showNavDiagrams }}" hint-placeholder-val="{{ true }}">
+<div style="flex:none;background:#F4F4F0;border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:18px 20px;font:500 11px/1 'IBM Plex Mono',monospace;color:#3C3C36">
+<div style="display:flex;align-items:center;gap:7px;margin-bottom:14px"><span style="padding:8px 11px;background:#141412;color:#fff;border-radius:3px">FEED</span><span style="color:#9A9A92">·</span><span style="padding:8px 11px;background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:3px">BEACON</span><span style="color:#9A9A92">·</span><span style="padding:8px 11px;background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:3px">SETUP</span></div>
+<div style="padding-left:14px;border-left:2px solid rgba(0,0,0,.14);display:flex;flex-direction:column;gap:8px;color:#5A5A52">
+<div>FEED → filter: ALL / REPORTS &nbsp;<span style="color:#9A9A92">S1 S2</span></div>
+<div>FEED → any message → detail &nbsp;<span style="color:#9A9A92">S3 S4</span></div>
+<div>FEED → QUICK MESSAGE → sending &nbsp;<span style="color:#9A9A92">S5 S8</span></div>
+<div>FEED → REPORT → type → detail &nbsp;<span style="color:#9A9A92">S6 S7</span></div>
+<div>FEED → FIND (search + filters) &nbsp;<span style="color:#9A9A92">S9</span></div>
+<div>BEACON → one shot · timed mode &nbsp;<span style="color:#9A9A92">S10</span></div>
+<div>SETUP → call sign · radio link &nbsp;<span style="color:#9A9A92">S11</span></div>
+<div style="color:#9A9A92">no screen is more than 2 taps from FEED</div>
+</div>
+</div>
+</sc-if>
+</div>
+
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#6B6B64;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,.09);margin-bottom:22px">READING — S1 TO S4</div>
+<div style="display:flex;gap:26px;flex-wrap:wrap;margin-bottom:34px">
+
+<div style="flex:none;display:flex;flex-direction:column;gap:10px">
+<div style="width:360px;height:640px;background:#FAFAF8;border:1px solid rgba(0,0,0,.14);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;color:#141412">
+<div style="height:24px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font:500 9.5px/1 'IBM Plex Mono',monospace;color:#6B6B64"><span>14:23</span><span>NO SIM · BATT 62%</span></div>
+<div style="height:52px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:#fff">
+<span style="font:700 19px/1 Archivo;letter-spacing:-.01em">Channel</span>
+<span style="font:600 12px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:oklch(0.48 0.16 250)">FIND</span>
+</div>
+<div style="flex:none;display:flex;gap:18px;padding:0 18px;background:#fff;border-bottom:1px solid rgba(0,0,0,.10)">
+<div style="height:42px;display:flex;align-items:center;font:700 13px/1 Archivo;letter-spacing:.04em;border-bottom:2.5px solid #141412">ALL</div>
+<div style="height:42px;display:flex;align-items:center;gap:7px;font:500 13px/1 Archivo;letter-spacing:.04em;color:#6B6B64">REPORTS<span style="font:600 10px/1 'IBM Plex Mono',monospace;color:oklch(0.48 0.20 28)">2</span></div>
+</div>
+<div style="flex:none;display:flex;align-items:center;gap:9px;padding:8px 18px;background:#EFEFEA;border-bottom:1px solid rgba(0,0,0,.06)">
+<span style="width:7px;height:7px;border-radius:50%;background:oklch(0.58 0.14 150);flex:none"></span>
+<span style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.05em;color:#4A4A44">CABLE · LISTENING</span>
+<span style="margin-left:auto;font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.05em;color:#6B6B64">BEACON OFF</span>
+</div>
+<div style="flex:1;overflow:hidden;background:#fff">
+<div style="padding:13px 18px;border-bottom:1px solid rgba(0,0,0,.07);display:flex;gap:12px;align-items:baseline">
+<span style="font:600 11px/1.3 'IBM Plex Mono',monospace;letter-spacing:.04em;width:50px;flex:none">BASE-1</span>
+<span style="font:500 14.5px/1.35 Archivo;flex:1;min-width:0;text-wrap:pretty">Road at Km 14 cleared. Convoy may proceed.</span>
+<span style="font:400 10px/1.3 'IBM Plex Mono',monospace;color:#6B6B64;flex:none">14:22</span>
+</div>
+<div style="padding:14px 18px 16px;border-bottom:1px solid rgba(0,0,0,.07);border-left:4px solid oklch(0.52 0.20 28);display:flex;flex-direction:column;gap:8px;background:#FFFCFB">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:700 13px/1 Archivo;letter-spacing:.06em;color:oklch(0.44 0.20 28)">LANDSLIDE</span><span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">14:09</span></div>
+<div style="font:500 15px/1.35 Archivo;text-wrap:pretty">Slope failure across single lane, no casualties, backhoe needed.</div>
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">HALAPITAN</span><span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#5A5A52">R-07 · PHOTO</span></div>
+</div>
+<div style="padding:13px 18px;border-bottom:1px solid rgba(0,0,0,.07);display:flex;gap:12px;align-items:baseline">
+<span style="font:600 11px/1.3 'IBM Plex Mono',monospace;letter-spacing:.04em;width:50px;flex:none">R-12</span>
+<span style="font:500 14.5px/1.35 Archivo;flex:1;min-width:0;text-wrap:pretty">Reached staging area, four personnel.</span>
+<span style="font:400 10px/1.3 'IBM Plex Mono',monospace;color:#6B6B64;flex:none">13:58</span>
+</div>
+<div style="padding:13px 18px;border-bottom:1px solid rgba(0,0,0,.07);display:flex;gap:12px;align-items:baseline">
+<span style="font:600 11px/1.3 'IBM Plex Mono',monospace;letter-spacing:.04em;width:50px;flex:none">{{ callSign }}</span>
+<span style="font:500 14.5px/1.35 Archivo;flex:1;min-width:0;text-wrap:pretty">Passing Bulalang, proceeding to sitio.</span>
+<span style="font:400 10px/1.3 'IBM Plex Mono',monospace;color:#6B6B64;flex:none">13:41</span>
+</div>
+<div style="padding:14px 18px 16px;border-bottom:1px solid rgba(0,0,0,.07);border-left:4px solid oklch(0.58 0.15 240);display:flex;flex-direction:column;gap:8px;background:#FBFCFD">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:700 13px/1 Archivo;letter-spacing:.06em;color:oklch(0.42 0.15 240)">FLOOD</span><span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">13:47</span></div>
+<div style="font:500 15px/1.35 Archivo;text-wrap:pretty">Riverside households above ankle depth, six families moving.</div>
+</div>
+</div>
+<div style="flex:none;padding:11px 18px 12px;background:#FAFAF8;border-top:1px solid rgba(0,0,0,.09);display:flex;gap:10px">
+<div style="flex:1;height:58px;border-radius:8px;background:oklch(0.48 0.16 250);color:#fff;display:flex;align-items:center;justify-content:center;font:700 15.5px/1 Archivo">QUICK MESSAGE</div>
+<div style="width:100px;flex:none;height:58px;border-radius:8px;background:#fff;border:1.5px solid #141412;color:#141412;display:flex;align-items:center;justify-content:center;font:700 13px/1 Archivo">REPORT</div>
+</div>
+<div style="height:58px;flex:none;display:flex;background:#fff;border-top:1px solid rgba(0,0,0,.10)">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="width:16px;height:3px;background:#141412"></span><span style="font:700 10.5px/1 Archivo;letter-spacing:.05em">FEED</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="width:16px;height:3px;background:transparent"></span><span style="font:500 10.5px/1 Archivo;letter-spacing:.05em;color:#6B6B64">BEACON</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="width:16px;height:3px;background:transparent"></span><span style="font:500 10.5px/1 Archivo;letter-spacing:.05em;color:#6B6B64">SETUP</span></div>
+</div>
+</div>
+<div style="width:360px;font:400 11.5px/1.5 Archivo;color:#5A5A52;text-wrap:pretty"><span style="font:600 10px/1 'IBM Plex Mono',monospace;color:#141412">S1 &nbsp;FEED · ALL</span><br>Purpose: know what the channel has said. Chatter is one line; reports get a type word, a tinted ground and a place. Five messages visible on a 640 dp screen even with both compose buttons docked.</div>
+</div>
+
+<div style="flex:none;display:flex;flex-direction:column;gap:10px">
+<div style="width:360px;height:640px;background:#FAFAF8;border:1px solid rgba(0,0,0,.14);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;color:#141412">
+<div style="height:24px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font:500 9.5px/1 'IBM Plex Mono',monospace;color:#6B6B64"><span>14:24</span><span>NO SIM · BATT 62%</span></div>
+<div style="height:52px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:#fff">
+<span style="font:700 19px/1 Archivo;letter-spacing:-.01em">Channel</span>
+<span style="font:600 12px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:oklch(0.48 0.16 250)">FIND</span>
+</div>
+<div style="flex:none;display:flex;gap:18px;padding:0 18px;background:#fff;border-bottom:1px solid rgba(0,0,0,.10)">
+<div style="height:42px;display:flex;align-items:center;font:500 13px/1 Archivo;letter-spacing:.04em;color:#6B6B64">ALL</div>
+<div style="height:42px;display:flex;align-items:center;font:700 13px/1 Archivo;letter-spacing:.04em;border-bottom:2.5px solid #141412">REPORTS</div>
+</div>
+<div style="flex:none;display:flex;align-items:center;gap:9px;padding:8px 18px;background:#EFEFEA;border-bottom:1px solid rgba(0,0,0,.06)">
+<span style="width:7px;height:7px;border-radius:50%;background:oklch(0.58 0.14 150);flex:none"></span>
+<span style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.05em;color:#4A4A44">CABLE · LISTENING</span>
+<span style="margin-left:auto;font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.05em;color:#6B6B64">BEACON OFF</span>
+</div>
+<div style="flex:1;overflow:hidden;padding:14px 18px 0;display:flex;flex-direction:column;gap:12px">
+<div style="background:#fff;border:1px solid rgba(0,0,0,.10);border-left:4px solid oklch(0.52 0.20 28);border-radius:6px;padding:15px 15px 16px;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:700 14px/1 Archivo;letter-spacing:.06em;color:oklch(0.44 0.20 28)">LANDSLIDE</span><span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">14:09</span></div>
+<div style="font:500 15px/1.35 Archivo;text-wrap:pretty">Slope failure across single lane, no casualties, backhoe needed.</div>
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">HALAPITAN</span><span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#5A5A52">R-07 · PHOTO</span></div>
+</div>
+<div style="background:#fff;border:1px solid rgba(0,0,0,.10);border-left:4px solid oklch(0.58 0.15 240);border-radius:6px;padding:15px 15px 16px;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:700 14px/1 Archivo;letter-spacing:.06em;color:oklch(0.42 0.15 240)">FLOOD</span><span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">13:47</span></div>
+<div style="font:500 15px/1.35 Archivo;text-wrap:pretty">Riverside households above ankle depth, six families moving to school.</div>
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">BULALANG</span><span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#5A5A52">R-03</span></div>
+</div>
+<div style="background:#fff;border:1px solid rgba(0,0,0,.10);border-left:4px solid rgba(0,0,0,.22);border-radius:6px;padding:15px 15px 16px;display:flex;flex-direction:column;gap:8px;opacity:.7">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:700 14px/1 Archivo;letter-spacing:.06em;color:#3C3C36">VEHICULAR</span><span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">11:02</span></div>
+<div style="font:500 15px/1.35 Archivo;text-wrap:pretty">Motorcycle off road at curve, one injured, transported.</div>
+</div>
+</div>
+<div style="flex:none;padding:11px 18px 12px;background:#FAFAF8;border-top:1px solid rgba(0,0,0,.09);display:flex;gap:10px">
+<div style="flex:1;height:58px;border-radius:8px;background:oklch(0.48 0.16 250);color:#fff;display:flex;align-items:center;justify-content:center;font:700 15.5px/1 Archivo">QUICK MESSAGE</div>
+<div style="width:100px;flex:none;height:58px;border-radius:8px;background:#141412;border:1.5px solid #141412;color:#fff;display:flex;align-items:center;justify-content:center;font:700 13px/1 Archivo">REPORT</div>
+</div>
+<div style="height:58px;flex:none;display:flex;background:#fff;border-top:1px solid rgba(0,0,0,.10)">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="width:16px;height:3px;background:#141412"></span><span style="font:700 10.5px/1 Archivo;letter-spacing:.05em">FEED</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="width:16px;height:3px;background:transparent"></span><span style="font:500 10.5px/1 Archivo;letter-spacing:.05em;color:#6B6B64">BEACON</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="width:16px;height:3px;background:transparent"></span><span style="font:500 10.5px/1 Archivo;letter-spacing:.05em;color:#6B6B64">SETUP</span></div>
+</div>
+</div>
+<div style="width:360px;font:400 11.5px/1.5 Archivo;color:#5A5A52;text-wrap:pretty"><span style="font:600 10px/1 'IBM Plex Mono',monospace;color:#141412">S2 &nbsp;FEED · REPORTS</span><br>Same scroll, chatter removed. REPORT turns solid black here because filing a report is the expected next act in this context — the only place the two buttons change weight.</div>
+</div>
+
+<div style="flex:none;display:flex;flex-direction:column;gap:10px">
+<div style="width:360px;height:640px;background:#FAFAF8;border:1px solid rgba(0,0,0,.14);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;color:#141412">
+<div style="height:24px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font:500 9.5px/1 'IBM Plex Mono',monospace;color:#6B6B64"><span>14:25</span><span>NO SIM · BATT 62%</span></div>
+<div style="height:52px;flex:none;display:flex;align-items:center;gap:14px;padding:0 18px;background:#fff;border-bottom:1px solid rgba(0,0,0,.08)">
+<span style="font:600 12px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#5A5A52">FEED</span>
+<span style="font:700 15px/1 Archivo">Report</span>
+</div>
+<div style="flex:1;overflow:hidden;padding:22px 18px 0;display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;align-items:baseline;gap:10px"><span style="font:700 22px/1 Archivo;letter-spacing:.04em;color:oklch(0.44 0.20 28)">LANDSLIDE</span></div>
+<div style="font:500 19px/1.4 Archivo;text-wrap:pretty">Slope failure across single lane, no casualties, backhoe needed.</div>
+<div style="height:132px;border-radius:6px;background:repeating-linear-gradient(135deg,#E4E4DE 0 9px,#EFEFEA 9px 18px);border:1px solid rgba(0,0,0,.10);display:flex;align-items:flex-end;padding:12px"><span style="font:500 9.5px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#4A4A44;background:#FAFAF8;padding:5px 7px;border-radius:3px">SSTV IMAGE · DECODED 14:12 · TAP TO ENLARGE</span></div>
+<div style="display:flex;flex-direction:column;gap:11px;padding-top:14px;border-top:1px solid rgba(0,0,0,.09)">
+<div style="display:flex;justify-content:space-between"><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6B6B64">FROM</span><span style="font:500 10.5px/1 'IBM Plex Mono',monospace">R-07</span></div>
+<div style="display:flex;justify-content:space-between"><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6B6B64">RECEIVED</span><span style="font:500 10.5px/1 'IBM Plex Mono',monospace">14:09 · 18 SEP</span></div>
+<div style="display:flex;justify-content:space-between"><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6B6B64">POSITION</span><span style="font:500 10.5px/1 'IBM Plex Mono',monospace">7.8921, 125.2886</span></div>
+<div style="display:flex;justify-content:space-between"><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6B6B64">PLACE</span><span style="font:500 10.5px/1 'IBM Plex Mono',monospace">HALAPITAN</span></div>
+</div>
+</div>
+<div style="flex:none;padding:0 18px 20px;display:flex;flex-direction:column;gap:9px">
+<div style="height:62px;border-radius:8px;background:oklch(0.48 0.16 250);color:#fff;display:flex;align-items:center;justify-content:center;font:700 17px/1 Archivo">REPLY ON CHANNEL</div>
+<div style="height:42px;display:flex;align-items:center;justify-content:center;font:600 12.5px/1 Archivo;color:#5A5A52">Copy coordinates</div>
+</div>
+</div>
+<div style="width:360px;font:400 11.5px/1.5 Archivo;color:#5A5A52;text-wrap:pretty"><span style="font:600 10px/1 'IBM Plex Mono',monospace;color:#141412">S3 &nbsp;REPORT DETAIL — RECEIVED</span><br>Everything the feed suppressed lands here, as a plain label/value table. Primary action is to answer on the channel, because on a broadcast net acknowledging is the real response.</div>
+</div>
+
+<div style="flex:none;display:flex;flex-direction:column;gap:10px">
+<div style="width:360px;height:640px;background:#FAFAF8;border:1px solid rgba(0,0,0,.14);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;color:#141412">
+<div style="height:24px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font:500 9.5px/1 'IBM Plex Mono',monospace;color:#6B6B64"><span>14:31</span><span>NO SIM · BATT 61%</span></div>
+<div style="height:52px;flex:none;display:flex;align-items:center;gap:14px;padding:0 18px;background:#fff;border-bottom:1px solid rgba(0,0,0,.08)">
+<span style="font:600 12px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#5A5A52">FEED</span>
+<span style="font:700 15px/1 Archivo">Your message</span>
+</div>
+<div style="flex:1;padding:22px 18px 0;display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;align-items:center;gap:9px">
+<span style="width:8px;height:8px;border-radius:50%;background:oklch(0.52 0.20 28);flex:none"></span>
+<span style="font:700 11.5px/1 'IBM Plex Mono',monospace;letter-spacing:.07em;color:oklch(0.44 0.20 28)">NOT TRANSMITTED</span>
+</div>
+<div style="font:500 19px/1.4 Archivo;text-wrap:pretty">Two families evacuating from riverside, need transport at junction.</div>
+<div style="padding:14px 15px;background:#F4EFEE;border-radius:6px;font:400 12.5px/1.5 Archivo;color:#4A3C3A;text-wrap:pretty">The audio cable was unplugged, so nothing went out on the channel. The message is still encoded and ready to send.</div>
+<div style="display:flex;flex-direction:column;gap:11px;padding-top:14px;border-top:1px solid rgba(0,0,0,.09)">
+<div style="display:flex;justify-content:space-between"><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6B6B64">FROM</span><span style="font:500 10.5px/1 'IBM Plex Mono',monospace">{{ callSign }}</span></div>
+<div style="display:flex;justify-content:space-between"><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6B6B64">COMPOSED</span><span style="font:500 10.5px/1 'IBM Plex Mono',monospace">14:24 · 18 SEP</span></div>
+<div style="display:flex;justify-content:space-between"><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6B6B64">POSITION</span><span style="font:500 10.5px/1 'IBM Plex Mono',monospace">7.8974, 125.2831</span></div>
+<div style="display:flex;justify-content:space-between"><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6B6B64">ATTEMPTS</span><span style="font:500 10.5px/1 'IBM Plex Mono',monospace">1 · 14:24</span></div>
+</div>
+<div style="font:400 11.5px/1.5 Archivo;color:#6B6B64;text-wrap:pretty">This channel gives no delivery confirmation. Sending again is normal practice when conditions are poor.</div>
+</div>
+<div style="flex:none;padding:0 18px 20px;display:flex;flex-direction:column;gap:9px">
+<div style="height:62px;border-radius:8px;background:#141412;color:#fff;display:flex;align-items:center;justify-content:center;font:700 17px/1 Archivo">RETRANSMIT</div>
+<div style="height:42px;display:flex;align-items:center;justify-content:center;font:600 12.5px/1 Archivo;color:#5A5A52">Edit and resend</div>
+</div>
+</div>
+<div style="width:360px;font:400 11.5px/1.5 Archivo;color:#5A5A52;text-wrap:pretty"><span style="font:600 10px/1 'IBM Plex Mono',monospace;color:#141412">S4 &nbsp;YOUR MESSAGE — LOCAL FAILURE</span><br>RETRANSMIT is the primary action on every sent message, failed or not; the sentence above it is what stops a responder reading it as "nobody received this".</div>
+</div>
+
+</div>
+
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#6B6B64;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,.09);margin-bottom:22px">SENDING — S5 TO S8</div>
+<div style="display:flex;gap:26px;flex-wrap:wrap;margin-bottom:34px">
+
+<div style="flex:none;display:flex;flex-direction:column;gap:10px">
+<div style="width:360px;height:640px;background:#FAFAF8;border:1px solid rgba(0,0,0,.14);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;color:#141412">
+<div style="height:24px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font:500 9.5px/1 'IBM Plex Mono',monospace;color:#6B6B64"><span>14:24</span><span>NO SIM · BATT 62%</span></div>
+<div style="height:52px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:#fff;border-bottom:1px solid rgba(0,0,0,.08)">
+<span style="font:600 12px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#5A5A52">CANCEL</span>
+<span style="font:700 15px/1 Archivo">Quick message</span>
+<span style="width:46px"></span>
+</div>
+<div style="flex:1;padding:22px 18px 0;display:flex;flex-direction:column">
+<div style="font:500 22px/1.35 Archivo;text-wrap:pretty">Two families evacuating from riverside, need transport at junction</div>
+<div style="width:2px;height:26px;background:oklch(0.48 0.16 250);margin-top:6px"></div>
+<div style="margin-top:auto;padding-bottom:14px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;align-items:center;gap:10px;padding:13px 14px;background:#EFEFEA;border-radius:6px">
+<span style="width:7px;height:7px;border-radius:50%;background:oklch(0.58 0.14 150);flex:none"></span>
+<span style="font:500 10.5px/1.4 'IBM Plex Mono',monospace;color:#4A4A44">7.8974, 125.2831 · ATTACHED</span>
+<span style="margin-left:auto;font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">{{ callSign }}</span>
+</div>
+<div style="height:52px;border:1px solid rgba(0,0,0,.16);border-radius:6px;display:flex;align-items:center;justify-content:center;gap:10px;background:#fff">
+<span style="font:600 13px/1 Archivo;color:#3C3C36">Add photo</span>
+<span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">+2 MIN AIRTIME</span>
+</div>
+</div>
+</div>
+<div style="flex:none;padding:0 18px 16px">
+<div style="height:64px;border-radius:8px;background:oklch(0.48 0.16 250);color:#fff;display:flex;align-items:center;justify-content:center;font:700 18px/1 Archivo">SEND</div>
+</div>
+<div style="height:208px;flex:none;background:#DEDED8;border-top:1px solid rgba(0,0,0,.10);display:flex;align-items:center;justify-content:center;font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#7A7A72">SYSTEM KEYBOARD</div>
+</div>
+<div style="width:360px;font:400 11.5px/1.5 Archivo;color:#5A5A52;text-wrap:pretty"><span style="font:600 10px/1 'IBM Plex Mono',monospace;color:#141412">S5 &nbsp;QUICK MESSAGE</span><br>One field, one SEND, no form. Call sign, position and time are stated as already-attached facts. The photo option carries its own cost in airtime, so the tradeoff is visible at the moment of choosing.</div>
+</div>
+
+<div style="flex:none;display:flex;flex-direction:column;gap:10px">
+<div style="width:360px;height:640px;background:#FAFAF8;border:1px solid rgba(0,0,0,.14);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;color:#141412">
+<div style="height:24px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font:500 9.5px/1 'IBM Plex Mono',monospace;color:#6B6B64"><span>14:27</span><span>NO SIM · BATT 61%</span></div>
+<div style="height:52px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:#fff;border-bottom:1px solid rgba(0,0,0,.08)">
+<span style="font:600 12px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#5A5A52">CANCEL</span>
+<span style="font:700 15px/1 Archivo">New report</span>
+<span style="font:400 11px/1 'IBM Plex Mono',monospace;color:#6B6B64">1 / 2</span>
+</div>
+<div style="flex:1;padding:26px 18px 18px;display:flex;flex-direction:column">
+<div style="font:600 17px/1.3 Archivo;margin-bottom:20px">What kind of incident?</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1">
+<div style="background:#fff;border:1.5px solid rgba(0,0,0,.14);border-radius:8px;display:flex;align-items:flex-end;padding:16px;font:700 18px/1.15 Archivo">Vehicular accident</div>
+<div style="background:#fff;border:1.5px solid rgba(0,0,0,.14);border-radius:8px;display:flex;align-items:flex-end;padding:16px;font:700 18px/1.15 Archivo">Flood</div>
+<div style="background:#141412;border:1.5px solid #141412;border-radius:8px;display:flex;align-items:flex-end;padding:16px;font:700 18px/1.15 Archivo;color:#fff">Landslide</div>
+<div style="background:#fff;border:1.5px solid rgba(0,0,0,.14);border-radius:8px;display:flex;align-items:flex-end;padding:16px;font:700 18px/1.15 Archivo">Fire</div>
+</div>
+</div>
+<div style="flex:none;padding:0 18px 20px">
+<div style="height:64px;border-radius:8px;background:oklch(0.48 0.16 250);color:#fff;display:flex;align-items:center;justify-content:center;font:700 18px/1 Archivo">NEXT — DESCRIBE IT</div>
+</div>
+</div>
+<div style="width:360px;font:400 11.5px/1.5 Archivo;color:#5A5A52;text-wrap:pretty"><span style="font:600 10px/1 'IBM Plex Mono',monospace;color:#141412">S6 &nbsp;REPORT · STEP 1 OF 2</span><br>Four types, four 150 dp tiles. Gloved, moving, one-handed selection with no dropdown. Two steps rather than one crowded form — the split the brief asks for when a screen wants to show everything.</div>
+</div>
+
+<div style="flex:none;display:flex;flex-direction:column;gap:10px">
+<div style="width:360px;height:640px;background:#FAFAF8;border:1px solid rgba(0,0,0,.14);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;color:#141412">
+<div style="height:24px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font:500 9.5px/1 'IBM Plex Mono',monospace;color:#6B6B64"><span>14:28</span><span>NO SIM · BATT 61%</span></div>
+<div style="height:52px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:#fff;border-bottom:1px solid rgba(0,0,0,.08)">
+<span style="font:600 12px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#5A5A52">BACK</span>
+<span style="font:700 15px/1 Archivo">Landslide</span>
+<span style="font:400 11px/1 'IBM Plex Mono',monospace;color:#6B6B64">2 / 2</span>
+</div>
+<div style="flex:1;padding:20px 18px 0;display:flex;flex-direction:column">
+<div style="font:500 20px/1.35 Archivo;text-wrap:pretty">Slope failure across single lane, no casualties, backhoe needed</div>
+<div style="width:2px;height:24px;background:oklch(0.48 0.16 250);margin-top:6px"></div>
+<div style="margin-top:auto;padding-bottom:14px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;gap:10px;align-items:stretch">
+<div style="width:74px;height:74px;flex:none;border-radius:6px;background:repeating-linear-gradient(135deg,#E4E4DE 0 9px,#EFEFEA 9px 18px);border:1px solid rgba(0,0,0,.12)"></div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:5px">
+<span style="font:600 12.5px/1.2 Archivo">Photo attached</span>
+<span style="font:400 10px/1.3 'IBM Plex Mono',monospace;color:#6B6B64">SSTV · ABOUT 2 MIN TO SEND</span>
+<span style="font:600 11px/1 Archivo;color:oklch(0.48 0.16 250)">Remove</span>
+</div>
+</div>
+<div style="display:flex;align-items:center;gap:10px;padding:13px 14px;background:#EFEFEA;border-radius:6px">
+<span style="width:7px;height:7px;border-radius:50%;background:oklch(0.58 0.14 150);flex:none"></span>
+<span style="font:500 10.5px/1.4 'IBM Plex Mono',monospace;color:#4A4A44">7.8921, 125.2886 · ATTACHED</span>
+<span style="margin-left:auto;font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">{{ callSign }}</span>
+</div>
+</div>
+</div>
+<div style="flex:none;padding:0 18px 20px">
+<div style="height:64px;border-radius:8px;background:oklch(0.48 0.16 250);color:#fff;display:flex;align-items:center;justify-content:center;font:700 18px/1 Archivo">SEND REPORT</div>
+</div>
+</div>
+<div style="width:360px;font:400 11.5px/1.5 Archivo;color:#5A5A52;text-wrap:pretty"><span style="font:600 10px/1 'IBM Plex Mono',monospace;color:#141412">S7 &nbsp;REPORT · STEP 2 OF 2</span><br>Type becomes the screen title, so it needs no field of its own. Description is the only input; photo and position sit beneath as attachments with their cost stated.</div>
+</div>
+
+<div style="flex:none;display:flex;flex-direction:column;gap:10px">
+<div style="width:360px;height:640px;background:#FAFAF8;border:1px solid rgba(0,0,0,.14);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;color:#141412">
+<div style="height:24px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font:500 9.5px/1 'IBM Plex Mono',monospace;color:#6B6B64"><span>14:29</span><span>NO SIM · BATT 60%</span></div>
+<div style="flex:none;display:flex;align-items:center;gap:9px;padding:14px 18px;background:#141412">
+<span style="width:7px;height:7px;border-radius:50%;background:oklch(0.72 0.16 85);flex:none"></span>
+<span style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#fff">TRANSMITTING — DO NOT UNPLUG</span>
+</div>
+<div style="flex:1;padding:34px 18px 0;display:flex;flex-direction:column">
+<div style="font:700 34px/1.1 Archivo;letter-spacing:-.01em;margin-bottom:8px">Sending photo</div>
+<div style="font:400 12px/1 'IBM Plex Mono',monospace;color:#5A5A52;margin-bottom:28px">LANDSLIDE REPORT · 1:48 REMAINING</div>
+<div style="height:10px;border-radius:5px;background:#E4E4DE;overflow:hidden;margin-bottom:12px"><div style="width:26%;height:10px;background:#141412"></div></div>
+<div style="display:flex;justify-content:space-between;margin-bottom:34px"><span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">TEXT AND POSITION SENT 14:29</span><span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">26%</span></div>
+<div style="font:400 13.5px/1.55 Archivo;color:#3C3C36;text-wrap:pretty">The text and your position already went out. You can lock the screen or put the phone away — the photo keeps sending.</div>
+</div>
+<div style="flex:none;padding:0 18px 20px;display:flex;flex-direction:column;gap:9px">
+<div style="height:58px;border-radius:8px;border:1.5px solid rgba(0,0,0,.2);background:#fff;display:flex;align-items:center;justify-content:center;font:700 15px/1 Archivo;color:#3C3C36">STOP SENDING PHOTO</div>
+<div style="font:400 11px/1.4 Archivo;color:#6B6B64;text-align:center">While this runs, the app cannot listen for incoming messages.</div>
+</div>
+</div>
+<div style="width:360px;font:400 11.5px/1.5 Archivo;color:#5A5A52;text-wrap:pretty"><span style="font:600 10px/1 'IBM Plex Mono',monospace;color:#141412">S8 &nbsp;TRANSMITTING</span><br>The one screen allowed to take over: a two-minute transmission is a hardware commitment. Text goes first and is confirmed separately, so a stopped photo never loses the message.</div>
+</div>
+
+</div>
+
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:#6B6B64;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,.09);margin-bottom:22px">FINDING AND CONTROLLING — S9 TO S12</div>
+<div style="display:flex;gap:26px;flex-wrap:wrap">
+
+<div style="flex:none;display:flex;flex-direction:column;gap:10px">
+<div style="width:360px;height:640px;background:#FAFAF8;border:1px solid rgba(0,0,0,.14);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;color:#141412">
+<div style="height:24px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font:500 9.5px/1 'IBM Plex Mono',monospace;color:#6B6B64"><span>15:02</span><span>NO SIM · BATT 59%</span></div>
+<div style="height:52px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:#fff;border-bottom:1px solid rgba(0,0,0,.08)">
+<span style="font:600 12px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#5A5A52">FEED</span>
+<span style="font:700 15px/1 Archivo">Find</span>
+<span style="font:600 12px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#6B6B64">CLEAR</span>
+</div>
+<div style="flex:1;padding:18px 18px 0;display:flex;flex-direction:column;gap:24px">
+<div style="height:56px;border:1.5px solid #141412;border-radius:8px;display:flex;align-items:center;padding:0 16px;background:#fff;gap:10px">
+<span style="font:500 17px/1 Archivo">halapitan</span>
+<span style="width:2px;height:22px;background:oklch(0.48 0.16 250)"></span>
+</div>
+<div>
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B6B64;margin-bottom:12px">TYPE</div>
+<div style="display:flex;flex-wrap:wrap;gap:9px">
+<div style="height:46px;padding:0 16px;border-radius:23px;background:#141412;color:#fff;display:flex;align-items:center;font:600 13.5px/1 Archivo">Landslide</div>
+<div style="height:46px;padding:0 16px;border-radius:23px;background:#fff;border:1px solid rgba(0,0,0,.16);display:flex;align-items:center;font:500 13.5px/1 Archivo">Flood</div>
+<div style="height:46px;padding:0 16px;border-radius:23px;background:#fff;border:1px solid rgba(0,0,0,.16);display:flex;align-items:center;font:500 13.5px/1 Archivo">Fire</div>
+<div style="height:46px;padding:0 16px;border-radius:23px;background:#fff;border:1px solid rgba(0,0,0,.16);display:flex;align-items:center;font:500 13.5px/1 Archivo">Vehicular</div>
+</div>
+</div>
+<div>
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B6B64;margin-bottom:12px">WHEN</div>
+<div style="display:flex;gap:9px">
+<div style="flex:1;height:52px;border-radius:8px;background:#141412;color:#fff;display:flex;align-items:center;justify-content:center;font:600 13.5px/1 Archivo">Today</div>
+<div style="flex:1;height:52px;border-radius:8px;background:#fff;border:1px solid rgba(0,0,0,.16);display:flex;align-items:center;justify-content:center;font:500 13.5px/1 Archivo">7 days</div>
+<div style="flex:1;height:52px;border-radius:8px;background:#fff;border:1px solid rgba(0,0,0,.16);display:flex;align-items:center;justify-content:center;font:500 13.5px/1 Archivo">Pick</div>
+</div>
+</div>
+</div>
+<div style="flex:none;padding:0 18px 20px">
+<div style="height:64px;border-radius:8px;background:oklch(0.48 0.16 250);color:#fff;display:flex;align-items:center;justify-content:center;gap:10px;font:700 17px/1 Archivo">SHOW 3 MESSAGES</div>
+</div>
+</div>
+<div style="width:360px;font:400 11.5px/1.5 Archivo;color:#5A5A52;text-wrap:pretty"><span style="font:600 10px/1 'IBM Plex Mono',monospace;color:#141412">S9 &nbsp;FIND</span><br>Search and both required filters on one screen, off the feed entirely. The button counts matches before you commit, so a filter that returns nothing is never a surprise. Results open as the feed, filtered.</div>
+</div>
+
+<div style="flex:none;display:flex;flex-direction:column;gap:10px">
+<div style="width:360px;height:640px;background:#FAFAF8;border:1px solid rgba(0,0,0,.14);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;color:#141412">
+<div style="height:24px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font:500 9.5px/1 'IBM Plex Mono',monospace;color:#6B6B64"><span>15:04</span><span>NO SIM · BATT 59%</span></div>
+<div style="height:52px;flex:none;display:flex;align-items:center;padding:0 18px;background:#fff;border-bottom:1px solid rgba(0,0,0,.08)">
+<span style="font:700 19px/1 Archivo;letter-spacing:-.01em">Beacon</span>
+</div>
+<div style="flex:1;padding:22px 18px 0;display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;align-items:baseline;gap:10px">
+<span style="font:700 26px/1.1 Archivo">Off</span>
+<span style="font:500 11px/1 'IBM Plex Mono',monospace;color:#4A4A44">· LISTENING FOR MESSAGES</span>
+</div>
+<div style="height:70px;border-radius:8px;background:#141412;color:#fff;display:flex;align-items:center;padding:0 20px;gap:12px">
+<span style="font:700 16.5px/1 Archivo">Beacon my position now</span>
+<span style="margin-left:auto;font:400 9.5px/1 'IBM Plex Mono',monospace;color:rgba(255,255,255,.72)">ONE SHOT</span>
+</div>
+<div style="font:400 12.5px/1.5 Archivo;color:#3C3C36;text-wrap:pretty">Sends your position once, in about four seconds, then goes straight back to listening. This is the safe option.</div>
+<div style="margin-top:6px;padding-top:20px;border-top:1px solid rgba(0,0,0,.09);display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;align-items:center;gap:14px">
+<div style="flex:1;display:flex;flex-direction:column;gap:5px"><span style="font:600 15px/1.2 Archivo">Repeat every 5 minutes</span><span style="font:400 11px/1.3 'IBM Plex Mono',monospace;color:#6B6B64">FOR 30 MIN, THEN OFF</span></div>
+<div style="width:56px;height:32px;border-radius:16px;background:#D4D4CC;border:1px solid rgba(0,0,0,.12);display:flex;align-items:center;padding:0 3px;flex:none"><span style="width:26px;height:26px;border-radius:13px;background:#fff;border:1px solid rgba(0,0,0,.14)"></span></div>
+</div>
+<div style="display:flex;gap:9px">
+<div style="flex:1;height:46px;border-radius:7px;background:#fff;border:1px solid rgba(0,0,0,.16);display:flex;align-items:center;justify-content:center;font:500 13px/1 Archivo;color:#6B6B64">15 min</div>
+<div style="flex:1;height:46px;border-radius:7px;background:#fff;border:1.5px solid #141412;display:flex;align-items:center;justify-content:center;font:600 13px/1 Archivo">30 min</div>
+<div style="flex:1;height:46px;border-radius:7px;background:#fff;border:1px solid rgba(0,0,0,.16);display:flex;align-items:center;justify-content:center;font:500 13px/1 Archivo;color:#6B6B64">60 min</div>
+</div>
+<div style="padding:14px 15px;background:#F4EFEE;border-radius:6px;display:flex;gap:11px;align-items:flex-start">
+<span style="width:8px;height:8px;border-radius:50%;background:oklch(0.52 0.20 28);flex:none;margin-top:5px"></span>
+<span style="font:400 12.5px/1.5 Archivo;color:#4A3C3A;text-wrap:pretty">While repeating is on, the app cannot receive messages. It turns itself off after the time you choose.</span>
+</div>
+</div>
+</div>
+<div style="height:58px;flex:none;display:flex;background:#fff;border-top:1px solid rgba(0,0,0,.10)">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="width:16px;height:3px;background:transparent"></span><span style="font:500 10.5px/1 Archivo;letter-spacing:.05em;color:#6B6B64">FEED</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="width:16px;height:3px;background:#141412"></span><span style="font:700 10.5px/1 Archivo;letter-spacing:.05em">BEACON</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="width:16px;height:3px;background:transparent"></span><span style="font:500 10.5px/1 Archivo;letter-spacing:.05em;color:#6B6B64">SETUP</span></div>
+</div>
+</div>
+<div style="width:360px;font:400 11.5px/1.5 Archivo;color:#5A5A52;text-wrap:pretty"><span style="font:600 10px/1 'IBM Plex Mono',monospace;color:#141412">S10 &nbsp;BEACON</span><br>The one-shot is the black primary; the repeating mode is a switch below a rule, always paired with a duration and the warning. Current state is a single word at the top, in the largest type on the screen.</div>
+</div>
+
+<div style="flex:none;display:flex;flex-direction:column;gap:10px">
+<div style="width:360px;height:640px;background:#FAFAF8;border:1px solid rgba(0,0,0,.14);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;color:#141412">
+<div style="height:24px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font:500 9.5px/1 'IBM Plex Mono',monospace;color:#6B6B64"><span>15:06</span><span>NO SIM · BATT 59%</span></div>
+<div style="height:52px;flex:none;display:flex;align-items:center;padding:0 18px;background:#fff;border-bottom:1px solid rgba(0,0,0,.08)">
+<span style="font:700 19px/1 Archivo;letter-spacing:-.01em">Setup</span>
+</div>
+<div style="flex:1;padding:22px 18px 0;display:flex;flex-direction:column;gap:22px">
+<div style="background:#fff;border:1px solid rgba(0,0,0,.12);border-radius:8px;padding:18px 18px 20px;display:flex;flex-direction:column;gap:10px">
+<span style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B6B64">YOUR CALL SIGN</span>
+<div style="display:flex;align-items:baseline;gap:12px"><span style="font:700 32px/1 'IBM Plex Mono',monospace;letter-spacing:.02em">{{ callSign }}</span><span style="margin-left:auto;font:600 12px/1 Archivo;color:oklch(0.48 0.16 250)">EDIT</span></div>
+<span style="font:400 11.5px/1.45 Archivo;color:#6B6B64;text-wrap:pretty">Goes out on every message you send. Everyone on the channel identifies you by it.</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px">
+<span style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B6B64">RADIO LINK</span>
+<div style="display:flex;align-items:center;gap:13px;height:58px;padding:0 16px;background:#fff;border:1.5px solid #141412;border-radius:8px">
+<span style="width:9px;height:9px;border-radius:50%;background:oklch(0.58 0.14 150);flex:none"></span>
+<span style="font:600 15px/1 Archivo">Audio cable</span>
+<span style="margin-left:auto;font:500 10px/1 'IBM Plex Mono',monospace;color:#4A4A44">CONNECTED</span>
+</div>
+<div style="display:flex;align-items:center;gap:13px;height:58px;padding:0 16px;background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:8px">
+<span style="width:9px;height:9px;border-radius:50%;background:#D4D4CC;flex:none"></span>
+<span style="font:500 15px/1 Archivo;color:#3C3C36">Acoustic coupling</span>
+<span style="margin-left:auto;font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">SPEAKER TO MIC</span>
+</div>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding-top:6px">
+<div style="flex:1;display:flex;flex-direction:column;gap:5px"><span style="font:600 15px/1.2 Archivo">Listen in the background</span><span style="font:400 11px/1.35 Archivo;color:#6B6B64">Keeps decoding with the screen off</span></div>
+<div style="width:56px;height:32px;border-radius:16px;background:#141412;display:flex;align-items:center;justify-content:flex-end;padding:0 3px;flex:none"><span style="width:26px;height:26px;border-radius:13px;background:#fff"></span></div>
+</div>
+</div>
+<div style="height:58px;flex:none;display:flex;background:#fff;border-top:1px solid rgba(0,0,0,.10)">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="width:16px;height:3px;background:transparent"></span><span style="font:500 10.5px/1 Archivo;letter-spacing:.05em;color:#6B6B64">FEED</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="width:16px;height:3px;background:transparent"></span><span style="font:500 10.5px/1 Archivo;letter-spacing:.05em;color:#6B6B64">BEACON</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="width:16px;height:3px;background:#141412"></span><span style="font:700 10.5px/1 Archivo;letter-spacing:.05em">SETUP</span></div>
+</div>
+</div>
+<div style="width:360px;font:400 11.5px/1.5 Archivo;color:#5A5A52;text-wrap:pretty"><span style="font:600 10px/1 'IBM Plex Mono',monospace;color:#141412">S11 &nbsp;SETUP</span><br>Three things only: who you are, how the radio is attached, whether background listening runs. Call sign is displayed at 32px in monospace and edited behind a deliberate tap — it is identity, not a preference.</div>
+</div>
+
+<div style="flex:none;display:flex;flex-direction:column;gap:10px">
+<div style="width:360px;height:640px;background:#141412;border:1px solid rgba(0,0,0,.4);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;color:#F2F2EC;position:relative">
+<div style="height:24px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font:500 9.5px/1 'IBM Plex Mono',monospace;color:#96968C"><span>21:40</span><span>NO SIM · BATT 44%</span></div>
+<div style="flex:none;padding:40px 22px 26px;text-align:center">
+<div style="font:300 62px/1 Archivo;letter-spacing:-.02em">21:40</div>
+<div style="font:500 12px/1 'IBM Plex Mono',monospace;color:#96968C;margin-top:10px">FRIDAY, 18 SEPTEMBER</div>
+</div>
+<div style="flex:1;padding:0 14px;display:flex;flex-direction:column;gap:10px">
+<div style="background:#22221E;border-radius:10px;padding:15px 16px;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font:700 9.5px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:oklch(0.72 0.17 30)">LANDSLIDE</span><span style="font:600 9.5px/1 'IBM Plex Mono',monospace;color:#A8A89E">R-07</span><span style="margin-left:auto;font:400 9.5px/1 'IBM Plex Mono',monospace;color:#96968C">NOW</span></div>
+<div style="font:500 15px/1.35 Archivo;text-wrap:pretty">Slope failure across single lane, no casualties, backhoe needed.</div>
+<div style="font:400 9.5px/1 'IBM Plex Mono',monospace;color:#96968C">HALAPITAN · PHOTO DECODING</div>
+</div>
+<div style="background:#1A1A16;border-radius:10px;padding:13px 16px;display:flex;align-items:center;gap:10px">
+<span style="width:7px;height:7px;border-radius:50%;background:oklch(0.68 0.15 150);flex:none"></span>
+<span style="font:500 11.5px/1.3 Archivo;color:#C8C8BE">SAFER 247 · listening on channel</span>
+<span style="margin-left:auto;font:400 9.5px/1 'IBM Plex Mono',monospace;color:#96968C">{{ callSign }}</span>
+</div>
+</div>
+<div style="flex:none;padding:0 22px 30px;font:400 11px/1.5 Archivo;color:#96968C;text-align:center">Decoded messages arrive here with the screen off</div>
+</div>
+<div style="width:360px;font:400 11.5px/1.5 Archivo;color:#5A5A52;text-wrap:pretty"><span style="font:600 10px/1 'IBM Plex Mono',monospace;color:#141412">S12 &nbsp;LOCK SCREEN</span><br>Assumption <span style="font:600 10px/1 'IBM Plex Mono',monospace">A6</span> made visible: the phone is pocketed, so the notification is where a message is actually noticed. The persistent low-key row is the only place "background listening" is ever stated as a claim.</div>
+</div>
+
+</div>
+
+<sc-if value="{{ showAnnotations }}" hint-placeholder-val="{{ true }}">
+<div style="margin-top:34px;padding-top:26px;border-top:1px solid rgba(0,0,0,.10);display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:26px">
+<div><div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B6B64;margin-bottom:10px">STATUS, IN EXACTLY THREE PLACES</div><div style="font:400 13px/1.55 Archivo;color:#3C3C36;text-wrap:pretty">One 30 dp strip under the feed's tabs carries link method, listening and beacon state — nowhere else, on no other screen, in the same word order every time. Per-message transmit status appears only on your own messages and only when abnormal. The lock-screen row is the third and last place. No banners, no toasts, no duplicate badges.</div></div>
+<div><div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B6B64;margin-bottom:10px">WHAT I DEMOTED, AND THE COST</div><div style="font:400 13px/1.55 Archivo;color:#3C3C36;text-wrap:pretty"><strong style="font-weight:600;color:#141412">Coordinates off the chatter rows</strong> — a quick message's position is in detail only; if responders routinely read positions off the feed, this is wrong and the row needs a third line. <strong style="font-weight:600;color:#141412">Search behind FIND</strong> — costs a tap, buys 56 dp of feed. <strong style="font-weight:600;color:#141412">No corrupt-decode inbox</strong> — a failed decode appears as a quiet row in the feed rather than a screen of its own, which the reliability requirement may want more loudly.</div></div>
+<div><div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B6B64;margin-bottom:10px">THE HONEST WEAKNESS</div><div style="font:400 13px/1.55 Archivo;color:#3C3C36;text-wrap:pretty">Merging <a href="#1a">1a</a>'s tab row with <a href="#1b">1b</a>'s docked buttons puts 294 dp of permanent chrome on a 640 dp screen — 46%. Five messages still fit, but this is the ceiling; nothing else can be added to the feed frame. If it needs to breathe more, the two candidates are collapsing the tab row on scroll, or moving BEACON out of the bottom nav into the status strip, which would drop the nav to two destinations.</div></div>
+<div><div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B6B64;margin-bottom:10px">NOT YET DESIGNED</div><div style="font:400 13px/1.55 Archivo;color:#3C3C36;text-wrap:pretty">Call sign edit screen, full-screen image viewer, filtered-results state of the feed, first-run setup, and the radio-disconnected variant of the status strip. Say the word and they go in this same frame. Distress from <a href="#1c">1c</a> is deliberately absent here pending MDRRMO protocol.</div></div>
+</div>
+</sc-if>
+</div>
+</div>
+</div>
+
+<p style="margin:26px 0 0;font:400 12.5px/1.6 Archivo;color:rgba(0,0,0,.55);max-width:900px;text-wrap:pretty">Try next: "collapse the tab row on scroll in <a href="#2a">2a</a>" · "move BEACON into the status strip and go to two destinations" · "add the call sign edit and image viewer screens" · "make <a href="#2a">2a</a> clickable so I can walk the send flow"</p>
+</section>
+
+<section style="padding:36px 44px 40px;border-bottom:1px solid rgba(0,0,0,.10)" id="t1">
+<div style="display:flex;align-items:baseline;gap:10px;margin:0 0 24px">
+<a style="font:600 10px/1 'IBM Plex Mono',monospace;padding:4px 8px;background:#141412;color:#fff;border-radius:4px" href="#t1">1</a>
+<span style="font:600 13px/1.2 Archivo;color:#141412">Three IA directions — conservative, separated, and action-first</span>
+</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:34px;align-items:flex-start">
+
+<div style="flex:none;display:flex;flex-direction:column;gap:10px;scroll-margin-top:16px" id="1a">
+<div style="display:flex;align-items:baseline;gap:9px;font:400 11px/1.3 Archivo;color:rgba(0,0,0,.55)"><a style="font:600 10.5px/1 'IBM Plex Mono',monospace;padding:4px 8px;background:rgba(0,0,0,.08);color:#141412;border-radius:5px" href="#1a">1a</a>One feed, two tabs inside it — three destinations total</div>
+<div style="background:#fff;border:1px solid rgba(0,0,0,.10);border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:30px 32px 32px;width:1330px;max-width:100%">
+
+<div style="display:flex;gap:28px;align-items:flex-start;margin-bottom:26px">
+<div style="flex:1;min-width:0">
+<h2 style="font:700 24px/1.2 Archivo;margin:0 0 10px;color:#141412">The safe read of the requirements</h2>
+<p style="font:400 14px/1.6 Archivo;color:#3C3C36;margin:0;max-width:620px;text-wrap:pretty">Reports and quick messages are the same stream of broadcast traffic, so they share one screen and one scroll. A segmented control narrows that stream; it never takes you somewhere new. Three bottom destinations means three fat targets and no thinking about where anything lives.</p>
+</div>
+<sc-if value="{{ showNavDiagrams }}" hint-placeholder-val="{{ true }}">
+<div style="flex:none;background:#F4F4F0;border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:16px 18px;font:500 11px/1 'IBM Plex Mono',monospace;color:#3C3C36">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="padding:7px 10px;background:#141412;color:#fff;border-radius:3px">FEED</span><span style="color:#9A9A92">·</span><span style="padding:7px 10px;background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:3px">BEACON</span><span style="color:#9A9A92">·</span><span style="padding:7px 10px;background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:3px">SETUP</span></div>
+<div style="padding-left:14px;border-left:2px solid rgba(0,0,0,.14);display:flex;flex-direction:column;gap:7px;color:#5A5A52">
+<div>FEED → tab: ALL / REPORTS</div>
+<div>FEED → message detail → retransmit</div>
+<div>FEED → compose → (report toggle)</div>
+<div>FEED → find (search + filter)</div>
+</div>
+</div>
+</sc-if>
+</div>
+
+<div style="display:flex;gap:26px;flex-wrap:wrap">
+
+<div style="flex:none;display:flex;flex-direction:column;gap:9px">
+<div style="width:360px;height:640px;background:#FAFAF8;border:1px solid rgba(0,0,0,.14);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;color:#141412">
+<div style="height:24px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font:500 9.5px/1 'IBM Plex Mono',monospace;color:#6B6B64"><span>14:23</span><span>NO SIM · BATT 62%</span></div>
+<div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:#fff;border-bottom:1px solid rgba(0,0,0,.08)">
+<span style="font:700 19px/1 Archivo;letter-spacing:-.01em">Channel</span>
+<span style="font:600 12px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:oklch(0.48 0.16 250)">FIND</span>
+</div>
+<div style="flex:none;display:flex;align-items:center;gap:9px;padding:9px 18px;background:#EFEFEA;border-bottom:1px solid rgba(0,0,0,.06)">
+<span style="width:7px;height:7px;border-radius:50%;background:oklch(0.58 0.14 150);flex:none"></span>
+<span style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.05em;color:#4A4A44">CABLE · LISTENING</span>
+<span style="margin-left:auto;font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.05em;color:#6B6B64">BEACON OFF</span>
+</div>
+<div style="flex:none;display:flex;padding:14px 18px 6px;gap:8px">
+<div style="flex:1;height:44px;border-radius:6px;background:#141412;color:#fff;display:flex;align-items:center;justify-content:center;font:600 12.5px/1 Archivo;letter-spacing:.03em">ALL TRAFFIC</div>
+<div style="flex:1;height:44px;border-radius:6px;background:#fff;border:1px solid rgba(0,0,0,.14);color:#5A5A52;display:flex;align-items:center;justify-content:center;font:600 12.5px/1 Archivo;letter-spacing:.03em">REPORTS <span style="font:600 10px/1 'IBM Plex Mono',monospace;margin-left:6px;color:#6B6B64">4</span></div>
+</div>
+<div style="flex:1;overflow:hidden;padding:8px 0 0">
+<div style="padding:15px 18px 17px;background:#fff;border-top:1px solid rgba(0,0,0,.07);display:flex;flex-direction:column;gap:7px">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.05em">BASE-1</span><span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">14:22</span></div>
+<div style="font:500 16px/1.35 Archivo;text-wrap:pretty">Road at Km 14 cleared. Convoy may proceed.</div>
+</div>
+<div style="padding:15px 18px 17px;background:#fff;border-top:1px solid rgba(0,0,0,.07);display:flex;flex-direction:column;gap:7px;border-left:3px solid oklch(0.52 0.20 28)">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.05em">R-07</span><span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">14:09</span></div>
+<div style="font:700 12px/1 'IBM Plex Mono',monospace;letter-spacing:.08em;color:oklch(0.48 0.20 28)">LANDSLIDE</div>
+<div style="font:500 16px/1.35 Archivo;text-wrap:pretty">Slope failure across single lane, no casualties, backhoe needed.</div>
+<div style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">HALAPITAN · 7.8921, 125.2886</div>
+</div>
+<div style="padding:15px 18px 17px;background:#fff;border-top:1px solid rgba(0,0,0,.07);display:flex;flex-direction:column;gap:7px">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.05em">R-12</span><span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">13:58</span></div>
+<div style="font:500 16px/1.35 Archivo;text-wrap:pretty">Reached staging area, four personnel.</div>
+</div>
+</div>
+<div style="flex:none;padding:0 18px 12px;margin-top:-58px;display:flex;justify-content:flex-end;pointer-events:none"><div style="height:58px;padding:0 26px;border-radius:29px;background:oklch(0.48 0.16 250);color:#fff;display:flex;align-items:center;font:700 15px/1 Archivo;letter-spacing:.02em;box-shadow:0 4px 14px rgba(0,0,0,.22)">MESSAGE</div></div>
+<div style="height:62px;flex:none;display:flex;background:#fff;border-top:1px solid rgba(0,0,0,.10)">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px"><span style="width:18px;height:3px;background:#141412"></span><span style="font:700 11px/1 Archivo;letter-spacing:.06em">FEED</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px"><span style="width:18px;height:3px;background:transparent"></span><span style="font:500 11px/1 Archivo;letter-spacing:.06em;color:#6B6B64">BEACON</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px"><span style="width:18px;height:3px;background:transparent"></span><span style="font:500 11px/1 Archivo;letter-spacing:.06em;color:#6B6B64">SETUP</span></div>
+</div>
+</div>
+<div style="width:360px;font:400 11.5px/1.5 Archivo;color:#5A5A52;text-wrap:pretty"><strong style="font-weight:600;color:#141412">Feed.</strong> Three cards visible on the smallest screen. Reports earn a type word and a location line; chatter earns neither.</div>
+</div>
+
+<div style="flex:none;display:flex;flex-direction:column;gap:9px">
+<div style="width:360px;height:640px;background:#FAFAF8;border:1px solid rgba(0,0,0,.14);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;color:#141412">
+<div style="height:24px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font:500 9.5px/1 'IBM Plex Mono',monospace;color:#6B6B64"><span>14:24</span><span>NO SIM · BATT 62%</span></div>
+<div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:#fff;border-bottom:1px solid rgba(0,0,0,.08)">
+<span style="font:600 12px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#5A5A52">CANCEL</span>
+<span style="font:700 15px/1 Archivo">Quick message</span>
+<span style="font:600 12px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:oklch(0.48 0.16 250)">REPORT</span>
+</div>
+<div style="flex:1;padding:22px 18px 0;display:flex;flex-direction:column">
+<div style="font:500 22px/1.35 Archivo;color:#141412;text-wrap:pretty">Two families evacuating from riverside, need transport at</div>
+<div style="width:2px;height:26px;background:oklch(0.48 0.16 250);margin-top:6px"></div>
+<div style="margin-top:auto;padding-bottom:16px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;align-items:center;gap:10px;padding:13px 14px;background:#EFEFEA;border-radius:6px">
+<span style="width:7px;height:7px;border-radius:50%;background:oklch(0.58 0.14 150);flex:none"></span>
+<span style="font:500 10.5px/1.4 'IBM Plex Mono',monospace;color:#4A4A44">7.8974, 125.2831 · ATTACHED</span>
+<span style="margin-left:auto;font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">{{ callSign }}</span>
+</div>
+<div style="height:52px;border:1px solid rgba(0,0,0,.16);border-radius:6px;display:flex;align-items:center;justify-content:center;gap:10px;background:#fff">
+<span style="font:600 13px/1 Archivo;color:#3C3C36">Add photo</span>
+<span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">+2 MIN AIRTIME</span>
+</div>
+</div>
+</div>
+<div style="flex:none;padding:0 18px 18px">
+<div style="height:64px;border-radius:8px;background:oklch(0.48 0.16 250);color:#fff;display:flex;align-items:center;justify-content:center;font:700 18px/1 Archivo;letter-spacing:.02em">SEND</div>
+</div>
+<div style="height:216px;flex:none;background:#DEDED8;border-top:1px solid rgba(0,0,0,.10);display:flex;align-items:center;justify-content:center;font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#9A9A92">SYSTEM KEYBOARD</div>
+</div>
+<div style="width:360px;font:400 11.5px/1.5 Archivo;color:#5A5A52;text-wrap:pretty"><strong style="font-weight:600;color:#141412">Quick composer.</strong> One field, one SEND. Call sign, location and timestamp are stated once as attached facts, not fields. Airtime cost is printed on the photo option.</div>
+</div>
+
+<div style="flex:none;display:flex;flex-direction:column;gap:9px">
+<div style="width:360px;height:640px;background:#FAFAF8;border:1px solid rgba(0,0,0,.14);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;color:#141412">
+<div style="height:24px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font:500 9.5px/1 'IBM Plex Mono',monospace;color:#6B6B64"><span>14:31</span><span>NO SIM · BATT 61%</span></div>
+<div style="height:54px;flex:none;display:flex;align-items:center;gap:14px;padding:0 18px;background:#fff;border-bottom:1px solid rgba(0,0,0,.08)">
+<span style="font:600 12px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#5A5A52">BACK</span>
+<span style="font:700 15px/1 Archivo">Your message</span>
+</div>
+<div style="flex:1;padding:24px 18px 0;display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;align-items:center;gap:9px">
+<span style="width:8px;height:8px;border-radius:50%;background:oklch(0.52 0.20 28);flex:none"></span>
+<span style="font:700 11.5px/1 'IBM Plex Mono',monospace;letter-spacing:.07em;color:oklch(0.46 0.20 28)">NOT TRANSMITTED</span>
+</div>
+<div style="font:500 20px/1.4 Archivo;text-wrap:pretty">Two families evacuating from riverside, need transport at junction.</div>
+<div style="display:flex;flex-direction:column;gap:11px;padding-top:4px;border-top:1px solid rgba(0,0,0,.09)">
+<div style="display:flex;justify-content:space-between;padding-top:12px"><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6B6B64">FROM</span><span style="font:500 10.5px/1 'IBM Plex Mono',monospace">{{ callSign }}</span></div>
+<div style="display:flex;justify-content:space-between"><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6B6B64">TIME</span><span style="font:500 10.5px/1 'IBM Plex Mono',monospace">14:24 · 18 SEP</span></div>
+<div style="display:flex;justify-content:space-between"><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6B6B64">POSITION</span><span style="font:500 10.5px/1 'IBM Plex Mono',monospace">7.8974, 125.2831</span></div>
+<div style="display:flex;justify-content:space-between"><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#6B6B64">CHANNEL</span><span style="font:500 10.5px/1 'IBM Plex Mono',monospace">APRS · 144.390</span></div>
+</div>
+<div style="padding:14px 15px;background:#F4EFEE;border-radius:6px;font:400 12.5px/1.5 Archivo;color:#4A3C3A;text-wrap:pretty">Radio was unplugged when you sent this, so nothing went out on the channel. The message is still encoded and ready.</div>
+</div>
+<div style="flex:none;padding:0 18px 20px;display:flex;flex-direction:column;gap:10px">
+<div style="height:64px;border-radius:8px;background:#141412;color:#fff;display:flex;align-items:center;justify-content:center;font:700 18px/1 Archivo;letter-spacing:.02em">RETRANSMIT</div>
+<div style="height:46px;display:flex;align-items:center;justify-content:center;font:600 13px/1 Archivo;color:#5A5A52">Edit and resend</div>
+</div>
+</div>
+<div style="width:360px;font:400 11.5px/1.5 Archivo;color:#5A5A52;text-wrap:pretty"><strong style="font-weight:600;color:#141412">Detail + retransmit.</strong> The failure sentence names the physical cause and says what did not happen — never "delivery failed", which the channel cannot know.</div>
+</div>
+
+</div>
+
+<sc-if value="{{ showAnnotations }}" hint-placeholder-val="{{ true }}">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:22px;margin-top:28px;padding-top:24px;border-top:1px solid rgba(0,0,0,.10)">
+<div><div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B6B64;margin-bottom:9px">PRIMARY ACTION</div><div style="font:400 13px/1.55 Archivo;color:#3C3C36;text-wrap:pretty">Feed: read the last few messages. The blue MESSAGE pill is the only floating element on the screen, and it composes a quick message — reports are a deliberate switch from inside the composer.</div></div>
+<div><div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B6B64;margin-bottom:9px">DEFAULT VS TUCKED AWAY</div><div style="font:400 13px/1.55 Archivo;color:#3C3C36;text-wrap:pretty">Default: sender, time, body. Tucked into detail: coordinates, channel, frequency, image, retransmit. Search and both filters sit behind FIND. Chatter hides its location line entirely — it is rarely the point.</div></div>
+<div><div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B6B64;margin-bottom:9px">STATUS MODEL</div><div style="font:400 13px/1.55 Archivo;color:#3C3C36;text-wrap:pretty">One 34 dp strip: link method, listening, beacon state. It is the same strip on every screen, so its meaning is learned once. Per-message status appears only on your own messages, and only when it is not the ordinary case.</div></div>
+<div><div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B6B64;margin-bottom:9px">TRADEOFF</div><div style="font:400 13px/1.55 Archivo;color:#3C3C36;text-wrap:pretty">Reports are one tap deeper than in <a href="#1b">1b</a>, and the tab row costs 58 dp at the top of the feed forever. In exchange there is exactly one place traffic lives, and the count badge still tells you reports arrived.</div></div>
+</div>
+</sc-if>
+</div>
+</div>
+
+<div style="flex:none;display:flex;flex-direction:column;gap:10px;scroll-margin-top:16px" id="1b">
+<div style="display:flex;align-items:baseline;gap:9px;font:400 11px/1.3 Archivo;color:rgba(0,0,0,.55)"><a style="font:600 10.5px/1 'IBM Plex Mono',monospace;padding:4px 8px;background:rgba(0,0,0,.08);color:#141412;border-radius:5px" href="#1b">1b</a>Reports as their own destination — four destinations, denser chatter</div>
+<div style="background:#fff;border:1px solid rgba(0,0,0,.10);border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:30px 32px 32px;width:1330px;max-width:100%">
+
+<div style="display:flex;gap:28px;align-items:flex-start;margin-bottom:26px">
+<div style="flex:1;min-width:0">
+<h2 style="font:700 24px/1.2 Archivo;margin:0 0 10px;color:#141412">Reports are a different kind of object</h2>
+<p style="font:400 14px/1.6 Archivo;color:#3C3C36;margin:0;max-width:620px;text-wrap:pretty">A report is a structured, actionable record; chatter is ephemeral. So they get different screens, different densities, and different reading postures. Chatter compresses to one line per message — you skim it. Reports open up — you act on them. The cost is a fourth destination.</p>
+</div>
+<sc-if value="{{ showNavDiagrams }}" hint-placeholder-val="{{ true }}">
+<div style="flex:none;background:#F4F4F0;border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:16px 18px;font:500 11px/1 'IBM Plex Mono',monospace;color:#3C3C36">
+<div style="display:flex;align-items:center;gap:6px;margin-bottom:12px"><span style="padding:7px 9px;background:#141412;color:#fff;border-radius:3px">TRAFFIC</span><span style="color:#9A9A92">·</span><span style="padding:7px 9px;background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:3px">REPORTS</span><span style="color:#9A9A92">·</span><span style="padding:7px 9px;background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:3px">BEACON</span><span style="color:#9A9A92">·</span><span style="padding:7px 9px;background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:3px">SETUP</span></div>
+<div style="padding-left:14px;border-left:2px solid rgba(0,0,0,.14);display:flex;flex-direction:column;gap:7px;color:#5A5A52">
+<div>TRAFFIC → quick message · report</div>
+<div>REPORTS → report detail → retransmit</div>
+<div>REPORTS → new report (type → detail)</div>
+<div>each tab carries its own find</div>
+</div>
+</div>
+</sc-if>
+</div>
+
+<div style="display:flex;gap:26px;flex-wrap:wrap">
+
+<div style="flex:none;display:flex;flex-direction:column;gap:9px">
+<div style="width:360px;height:640px;background:#FAFAF8;border:1px solid rgba(0,0,0,.14);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;color:#141412">
+<div style="height:24px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font:500 9.5px/1 'IBM Plex Mono',monospace;color:#6B6B64"><span>14:23</span><span>NO SIM · BATT 62%</span></div>
+<div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:#fff;border-bottom:1px solid rgba(0,0,0,.08)">
+<span style="font:700 19px/1 Archivo;letter-spacing:-.01em">Traffic</span>
+<span style="font:600 12px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:oklch(0.48 0.16 250)">FIND</span>
+</div>
+<div style="flex:none;display:flex;align-items:center;gap:9px;padding:9px 18px;background:#EFEFEA;border-bottom:1px solid rgba(0,0,0,.06)">
+<span style="width:7px;height:7px;border-radius:50%;background:oklch(0.58 0.14 150);flex:none"></span>
+<span style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.05em;color:#4A4A44">ACOUSTIC · LISTENING</span>
+<span style="margin-left:auto;font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.05em;color:#6B6B64">BEACON OFF</span>
+</div>
+<div style="flex:1;overflow:hidden">
+<div style="padding:14px 18px;background:#fff;border-bottom:1px solid rgba(0,0,0,.07);display:flex;gap:12px;align-items:baseline">
+<span style="font:600 11px/1.3 'IBM Plex Mono',monospace;letter-spacing:.04em;width:52px;flex:none">BASE-1</span>
+<span style="font:500 14.5px/1.35 Archivo;flex:1;min-width:0;text-wrap:pretty">Road at Km 14 cleared. Convoy may proceed.</span>
+<span style="font:400 10px/1.3 'IBM Plex Mono',monospace;color:#6B6B64;flex:none">14:22</span>
+</div>
+<div style="padding:14px 18px;background:#fff;border-bottom:1px solid rgba(0,0,0,.07);display:flex;gap:12px;align-items:baseline">
+<span style="font:600 11px/1.3 'IBM Plex Mono',monospace;letter-spacing:.04em;width:52px;flex:none">R-12</span>
+<span style="font:500 14.5px/1.35 Archivo;flex:1;min-width:0;text-wrap:pretty">Reached staging area, four personnel.</span>
+<span style="font:400 10px/1.3 'IBM Plex Mono',monospace;color:#6B6B64;flex:none">13:58</span>
+</div>
+<div style="padding:14px 18px;background:#fff;border-bottom:1px solid rgba(0,0,0,.07);display:flex;gap:12px;align-items:baseline">
+<span style="font:600 11px/1.3 'IBM Plex Mono',monospace;letter-spacing:.04em;width:52px;flex:none">{{ callSign }}</span>
+<span style="font:500 14.5px/1.35 Archivo;flex:1;min-width:0;text-wrap:pretty">Passing Bulalang, proceeding to sitio.</span>
+<span style="font:400 10px/1.3 'IBM Plex Mono',monospace;color:#6B6B64;flex:none">13:41</span>
+</div>
+<div style="padding:14px 18px;background:#fff;border-bottom:1px solid rgba(0,0,0,.07);display:flex;gap:12px;align-items:baseline">
+<span style="font:600 11px/1.3 'IBM Plex Mono',monospace;letter-spacing:.04em;width:52px;flex:none">R-03</span>
+<span style="font:500 14.5px/1.35 Archivo;flex:1;min-width:0;text-wrap:pretty">Water level at gauge is 2.1 m and rising slowly.</span>
+<span style="font:400 10px/1.3 'IBM Plex Mono',monospace;color:#6B6B64;flex:none">13:30</span>
+</div>
+<div style="padding:14px 18px;background:#fff;border-bottom:1px solid rgba(0,0,0,.07);display:flex;gap:12px;align-items:baseline">
+<span style="font:600 11px/1.3 'IBM Plex Mono',monospace;letter-spacing:.04em;width:52px;flex:none">BASE-1</span>
+<span style="font:500 14.5px/1.35 Archivo;flex:1;min-width:0;text-wrap:pretty">All units report position by 14:00.</span>
+<span style="font:400 10px/1.3 'IBM Plex Mono',monospace;color:#6B6B64;flex:none">13:12</span>
+</div>
+<div style="padding:14px 18px;background:#fff;border-bottom:1px solid rgba(0,0,0,.07);display:flex;gap:12px;align-items:baseline">
+<span style="font:600 11px/1.3 'IBM Plex Mono',monospace;letter-spacing:.04em;width:52px;flex:none">R-09</span>
+<span style="font:500 14.5px/1.35 Archivo;flex:1;min-width:0;text-wrap:pretty">Chainsaw fuel running low.</span>
+<span style="font:400 10px/1.3 'IBM Plex Mono',monospace;color:#6B6B64;flex:none">12:54</span>
+</div>
+</div>
+<div style="flex:none;padding:12px 18px 14px;background:#FAFAF8;border-top:1px solid rgba(0,0,0,.08);display:flex;gap:10px">
+<div style="flex:1;height:60px;border-radius:8px;background:oklch(0.48 0.16 250);color:#fff;display:flex;align-items:center;justify-content:center;font:700 16px/1 Archivo">QUICK MESSAGE</div>
+<div style="width:104px;flex:none;height:60px;border-radius:8px;background:#fff;border:1.5px solid #141412;color:#141412;display:flex;align-items:center;justify-content:center;font:700 13px/1.2 Archivo;text-align:center">REPORT</div>
+</div>
+<div style="height:62px;flex:none;display:flex;background:#fff;border-top:1px solid rgba(0,0,0,.10)">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="width:16px;height:3px;background:#141412"></span><span style="font:700 10px/1 Archivo;letter-spacing:.04em">TRAFFIC</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;position:relative"><span style="width:16px;height:3px;background:transparent"></span><span style="font:500 10px/1 Archivo;letter-spacing:.04em;color:#6B6B64">REPORTS</span><span style="position:absolute;top:10px;right:24px;min-width:16px;height:16px;border-radius:8px;background:oklch(0.52 0.20 28);color:#fff;font:600 9.5px/16px 'IBM Plex Mono',monospace;text-align:center">2</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="width:16px;height:3px;background:transparent"></span><span style="font:500 10px/1 Archivo;letter-spacing:.04em;color:#6B6B64">BEACON</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="width:16px;height:3px;background:transparent"></span><span style="font:500 10px/1 Archivo;letter-spacing:.04em;color:#6B6B64">SETUP</span></div>
+</div>
+</div>
+<div style="width:360px;font:400 11.5px/1.5 Archivo;color:#5A5A52;text-wrap:pretty"><strong style="font-weight:600;color:#141412">Traffic.</strong> Six messages visible instead of three. Call sign column is fixed-width so the eye scans senders vertically. Both compose entries are thumb-reachable and permanently visible.</div>
+</div>
+
+<div style="flex:none;display:flex;flex-direction:column;gap:9px">
+<div style="width:360px;height:640px;background:#FAFAF8;border:1px solid rgba(0,0,0,.14);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;color:#141412">
+<div style="height:24px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font:500 9.5px/1 'IBM Plex Mono',monospace;color:#6B6B64"><span>14:26</span><span>NO SIM · BATT 62%</span></div>
+<div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:#fff;border-bottom:1px solid rgba(0,0,0,.08)">
+<span style="font:700 19px/1 Archivo;letter-spacing:-.01em">Reports</span>
+<span style="font:600 12px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:oklch(0.48 0.16 250)">FIND</span>
+</div>
+<div style="flex:none;display:flex;align-items:center;gap:9px;padding:9px 18px;background:#EFEFEA;border-bottom:1px solid rgba(0,0,0,.06)">
+<span style="width:7px;height:7px;border-radius:50%;background:oklch(0.58 0.14 150);flex:none"></span>
+<span style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.05em;color:#4A4A44">ACOUSTIC · LISTENING</span>
+<span style="margin-left:auto;font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.05em;color:#6B6B64">BEACON OFF</span>
+</div>
+<div style="flex:1;overflow:hidden;padding:14px 18px 0;display:flex;flex-direction:column;gap:12px">
+<div style="background:#fff;border:1px solid rgba(0,0,0,.10);border-left:4px solid oklch(0.52 0.20 28);border-radius:6px;padding:16px 16px 17px;display:flex;flex-direction:column;gap:9px">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:700 14px/1 Archivo;letter-spacing:.06em;color:oklch(0.44 0.20 28)">LANDSLIDE</span><span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">14:09</span></div>
+<div style="font:500 15px/1.35 Archivo;text-wrap:pretty">Slope failure across single lane, no casualties, backhoe needed.</div>
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">HALAPITAN</span><span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#5A5A52">R-07 · PHOTO</span></div>
+</div>
+<div style="background:#fff;border:1px solid rgba(0,0,0,.10);border-left:4px solid oklch(0.58 0.15 240);border-radius:6px;padding:16px 16px 17px;display:flex;flex-direction:column;gap:9px">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:700 14px/1 Archivo;letter-spacing:.06em;color:oklch(0.44 0.15 240)">FLOOD</span><span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">13:47</span></div>
+<div style="font:500 15px/1.35 Archivo;text-wrap:pretty">Riverside households above ankle depth, six families moving to school.</div>
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">BULALANG</span><span style="font:500 10px/1 'IBM Plex Mono',monospace;color:#5A5A52">R-03</span></div>
+</div>
+<div style="background:#fff;border:1px solid rgba(0,0,0,.10);border-left:4px solid rgba(0,0,0,.25);border-radius:6px;padding:16px 16px 17px;display:flex;flex-direction:column;gap:9px;opacity:.72">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:700 14px/1 Archivo;letter-spacing:.06em;color:#3C3C36">VEHICULAR</span><span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6B6B64">11:02</span></div>
+<div style="font:500 15px/1.35 Archivo;text-wrap:pretty">Motorcycle off road at curve, one injured, transported.</div>
+</div>
+</div>
+<div style="flex:none;padding:12px 18px 14px;background:#FAFAF8;border-top:1px solid rgba(0,0,0,.08)">
+<div style="height:60px;border-radius:8px;background:#141412;color:#fff;display:flex;align-items:center;justify-content:center;font:700 16px/1 Archivo">NEW REPORT</div>
+</div>
+<div style="height:62px;flex:none;display:flex;background:#fff;border-top:1px solid rgba(0,0,0,.10)">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="width:16px;height:3px;background:transparent"></span><span style="font:500 10px/1 Archivo;letter-spacing:.04em;color:#6B6B64">TRAFFIC</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="width:16px;height:3px;background:#141412"></span><span style="font:700 10px/1 Archivo;letter-spacing:.04em">REPORTS</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="width:16px;height:3px;background:transparent"></span><span style="font:500 10px/1 Archivo;letter-spacing:.04em;color:#6B6B64">BEACON</span></div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px"><span style="width:16px;height:3px;background:transparent"></span><span style="font:500 10px/1 Archivo;letter-spacing:.04em;color:#6B6B64">SETUP</span></div>
+</div>
+</div>
+<div style="width:360px;font:400 11.5px/1.5 Archivo;color:#5A5A52;text-wrap:pretty"><strong style="font-weight:600;color:#141412">Reports.</strong> Type is the headline because it is what a responder searches their memory by. Older reports fade rather than disappear.</div>
+</div>
+
+<div style="flex:none;display:flex;flex-direction:column;gap:9px">
+<div style="width:360px;height:640px;background:#FAFAF8;border:1px solid rgba(0,0,0,.14);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;color:#141412">
+<div style="height:24px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font:500 9.5px/1 'IBM Plex Mono',monospace;color:#6B6B64"><span>14:27</span><span>NO SIM · BATT 61%</span></div>
+<div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:#fff;border-bottom:1px solid rgba(0,0,0,.08)">
+<span style="font:600 12px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#5A5A52">CANCEL</span>
+<span style="font:700 15px/1 Archivo">New report</span>
+<span style="font:400 11px/1 'IBM Plex Mono',monospace;color:#6B6B64">1 / 2</span>
+</div>
+<div style="flex:1;padding:26px 18px 18px;display:flex;flex-direction:column">
+<div style="font:600 17px/1.3 Archivo;margin-bottom:20px">What kind of incident?</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1">
+<div style="background:#fff;border:1.5px solid rgba(0,0,0,.14);border-radius:8px;display:flex;align-items:flex-end;padding:16px;font:700 18px/1.15 Archivo">Vehicular accident</div>
+<div style="background:#fff;border:1.5px solid rgba(0,0,0,.14);border-radius:8px;display:flex;align-items:flex-end;padding:16px;font:700 18px/1.15 Archivo">Flood</div>
+<div style="background:#141412;border:1.5px solid #141412;border-radius:8px;display:flex;align-items:flex-end;padding:16px;font:700 18px/1.15 Archivo;color:#fff">Landslide</div>
+<div style="background:#fff;border:1.5px solid rgba(0,0,0,.14);border-radius:8px;display:flex;align-items:flex-end;padding:16px;font:700 18px/1.15 Archivo">Fire</div>
+</div>
+</div>
+<div style="flex:none;padding:0 18px 20px">
+<div style="height:64px;border-radius:8px;background:oklch(0.48 0.16 250);color:#fff;display:flex;align-items:center;justify-content:center;font:700 18px/1 Archivo">NEXT — DESCRIBE IT</div>
+</div>
+</div>
+<div style="width:360px;font:400 11.5px/1.5 Archivo;color:#5A5A52;text-wrap:pretty"><strong style="font-weight:600;color:#141412">Report, step 1.</strong> Four types become four 150 dp tiles — gloved, moving, one-handed selection with no dropdown and no mis-tap. Step 2 is description plus optional photo, then send.</div>
+</div>
+
+</div>
+
+<sc-if value="{{ showAnnotations }}" hint-placeholder-val="{{ true }}">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:22px;margin-top:28px;padding-top:24px;border-top:1px solid rgba(0,0,0,.10)">
+<div><div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B6B64;margin-bottom:9px">PRIMARY ACTION</div><div style="font:400 13px/1.55 Archivo;color:#3C3C36;text-wrap:pretty">Traffic: skim and send a quick message. Reports: read the newest report, or file one. Each screen keeps its own primary button docked at the bottom, so the thumb never travels.</div></div>
+<div><div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B6B64;margin-bottom:9px">DEFAULT VS TUCKED AWAY</div><div style="font:400 13px/1.55 Archivo;color:#3C3C36;text-wrap:pretty">Chatter shows sender, body, time — nothing else, ever. Reports show type, body, place, sender, and whether a photo exists. Coordinates, frequency, full image and retransmit are all in detail.</div></div>
+<div><div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B6B64;margin-bottom:9px">STATUS MODEL</div><div style="font:400 13px/1.55 Archivo;color:#3C3C36;text-wrap:pretty">Same single strip as <a href="#1a">1a</a>. The red count on REPORTS is the one piece of state allowed to interrupt you from another tab, because a new report is the only arrival that usually demands a decision.</div></div>
+<div><div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B6B64;margin-bottom:9px">TRADEOFF</div><div style="font:400 13px/1.55 Archivo;color:#3C3C36;text-wrap:pretty">Four bottom targets at 360 dp is 90 dp each — still fine, but the ceiling. And the shared channel is now shown in two places, so a report you send is visible in Reports but not in Traffic. That split may misrepresent how the radio actually works.</div></div>
+</div>
+</sc-if>
+</div>
+</div>
+
+<div style="flex:none;display:flex;flex-direction:column;gap:10px;scroll-margin-top:16px" id="1c">
+<div style="display:flex;align-items:baseline;gap:9px;font:400 11px/1.3 Archivo;color:rgba(0,0,0,.55)"><a style="font:600 10.5px/1 'IBM Plex Mono',monospace;padding:4px 8px;background:rgba(0,0,0,.08);color:#141412;border-radius:5px" href="#1c">1c</a>Action-first home, night treatment, with the distress affordance</div>
+<div style="background:#fff;border:1px solid rgba(0,0,0,.10);border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:30px 32px 32px;width:1330px;max-width:100%">
+
+<div style="display:flex;gap:28px;align-items:flex-start;margin-bottom:26px">
+<div style="flex:1;min-width:0">
+<h2 style="font:700 24px/1.2 Archivo;margin:0 0 10px;color:#141412">The app opens on what you came to do</h2>
+<p style="font:400 14px/1.6 Archivo;color:#3C3C36;margin:0;max-width:620px;text-wrap:pretty">This one rejects the feed-first premise. If the phone comes out of a pocket under stress, it is usually to send something — the radio already told you what is happening. So home is two enormous buttons and a count of what you missed; traffic is one tap away. It is also the only direction with a distress send, rendered dark for night work.</p>
+</div>
+<sc-if value="{{ showNavDiagrams }}" hint-placeholder-val="{{ true }}">
+<div style="flex:none;background:#F4F4F0;border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:16px 18px;font:500 11px/1 'IBM Plex Mono',monospace;color:#3C3C36">
+<div style="display:flex;align-items:center;gap:6px;margin-bottom:12px"><span style="padding:7px 9px;background:#141412;color:#fff;border-radius:3px">READY</span><span style="color:#9A9A92">·</span><span style="padding:7px 9px;background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:3px">TRAFFIC</span><span style="color:#9A9A92">+</span><span style="padding:7px 9px;background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:3px">SETUP</span></div>
+<div style="padding-left:14px;border-left:2px solid rgba(0,0,0,.14);display:flex;flex-direction:column;gap:7px;color:#5A5A52">
+<div>READY → quick message · report</div>
+<div>READY → beacon now (one shot)</div>
+<div>READY → hold → distress</div>
+<div>TRAFFIC → all · reports · find</div>
+</div>
+</div>
+</sc-if>
+</div>
+
+<div style="display:flex;gap:26px;flex-wrap:wrap">
+
+<div style="flex:none;display:flex;flex-direction:column;gap:9px">
+<div style="width:360px;height:640px;background:#0E0E0C;border:1px solid rgba(0,0,0,.4);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;color:#F2F2EC">
+<div style="height:24px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font:500 9.5px/1 'IBM Plex Mono',monospace;color:#96968C"><span>21:14</span><span>NO SIM · BATT 48%</span></div>
+<div style="flex:none;display:flex;align-items:center;gap:9px;padding:14px 18px 12px">
+<span style="width:7px;height:7px;border-radius:50%;background:oklch(0.68 0.15 150);flex:none"></span>
+<span style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.05em;color:#B8B8AE">CABLE · LISTENING</span>
+<span style="margin-left:auto;font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.05em;color:#96968C">{{ callSign }}</span>
+</div>
+<div style="flex:1;padding:6px 18px 0;display:flex;flex-direction:column;gap:12px">
+<div style="height:150px;border-radius:10px;background:oklch(0.52 0.16 250);display:flex;flex-direction:column;justify-content:flex-end;padding:20px;gap:4px">
+<span style="font:700 27px/1.1 Archivo;color:#fff">Quick message</span>
+<span style="font:400 11px/1 'IBM Plex Mono',monospace;color:rgba(255,255,255,.72)">TEXT · POSITION · PHOTO</span>
+</div>
+<div style="height:96px;border-radius:10px;border:1.5px solid rgba(255,255,255,.28);display:flex;flex-direction:column;justify-content:flex-end;padding:18px;gap:4px">
+<span style="font:700 22px/1.1 Archivo">Incident report</span>
+<span style="font:400 11px/1 'IBM Plex Mono',monospace;color:#A8A89E">TYPE, THEN DETAIL</span>
+</div>
+<div style="height:62px;border-radius:10px;border:1.5px solid rgba(255,255,255,.14);display:flex;align-items:center;padding:0 18px;gap:12px">
+<span style="font:600 14px/1 Archivo;color:#E4E4DE">Beacon my position now</span>
+<span style="margin-left:auto;font:400 9.5px/1 'IBM Plex Mono',monospace;color:#A8A89E">ONE SHOT</span>
+</div>
+<div style="margin-top:auto;margin-bottom:12px;display:flex;align-items:center;gap:12px;padding:16px 18px;background:#1A1A16;border-radius:10px">
+<span style="min-width:26px;height:26px;border-radius:13px;background:oklch(0.62 0.20 28);color:#fff;font:700 12px/26px 'IBM Plex Mono',monospace;text-align:center;flex:none">3</span>
+<span style="font:600 14.5px/1.25 Archivo">new on channel</span>
+<span style="margin-left:auto;font:600 11px/1 'IBM Plex Mono',monospace;color:#A8A89E;letter-spacing:.06em">OPEN</span>
+</div>
+</div>
+<div style="flex:none;height:76px;background:#2A1412;border-top:1px solid rgba(255,255,255,.10);display:flex;align-items:center;justify-content:center;gap:12px">
+<span style="font:700 15px/1 Archivo;letter-spacing:.04em;color:oklch(0.72 0.17 30)">HOLD FOR DISTRESS</span>
+<span style="font:400 10px/1 'IBM Plex Mono',monospace;color:rgba(255,255,255,.75)">3 SEC</span>
+</div>
+</div>
+<div style="width:360px;font:400 11.5px/1.5 Archivo;color:#5A5A52;text-wrap:pretty"><strong style="font-weight:600;color:#141412">Ready.</strong> No list, no tab bar. Two send targets at 150 and 96 dp, a one-shot beacon, and unread traffic as a single number. Distress is hold-only, docked at the screen edge.</div>
+</div>
+
+<div style="flex:none;display:flex;flex-direction:column;gap:9px">
+<div style="width:360px;height:640px;background:#0E0E0C;border:1px solid rgba(0,0,0,.4);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;color:#F2F2EC">
+<div style="height:24px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font:500 9.5px/1 'IBM Plex Mono',monospace;color:#96968C"><span>21:15</span><span>NO SIM · BATT 48%</span></div>
+<div style="height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 18px;border-bottom:1px solid rgba(255,255,255,.10)">
+<span style="font:600 12px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#B8B8AE">READY</span>
+<span style="font:700 17px/1 Archivo">Channel</span>
+<span style="font:600 12px/1 'IBM Plex Mono',monospace;letter-spacing:.06em;color:oklch(0.72 0.13 250)">FIND</span>
+</div>
+<div style="flex:none;display:flex;padding:12px 18px 4px;gap:8px">
+<div style="flex:1;height:40px;border-radius:6px;background:#F2F2EC;color:#141412;display:flex;align-items:center;justify-content:center;font:600 12px/1 Archivo;letter-spacing:.03em">ALL</div>
+<div style="flex:1;height:40px;border-radius:6px;border:1px solid rgba(255,255,255,.2);color:#B8B8AE;display:flex;align-items:center;justify-content:center;font:600 12px/1 Archivo;letter-spacing:.03em">REPORTS</div>
+</div>
+<div style="flex:1;overflow:hidden;padding:8px 18px 0;display:flex;flex-direction:column;gap:2px">
+<div style="padding:15px 0;border-bottom:1px solid rgba(255,255,255,.09);display:flex;flex-direction:column;gap:7px">
+<div style="display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;border-radius:50%;background:oklch(0.68 0.15 150);flex:none"></span><span style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.05em">R-07</span><span style="margin-left:auto;font:400 10px/1 'IBM Plex Mono',monospace;color:#96968C">21:12</span></div>
+<div style="font:500 16px/1.35 Archivo;text-wrap:pretty">Team clear of the slope, moving to Halapitan hall.</div>
+</div>
+<div style="padding:15px 0;border-bottom:1px solid rgba(255,255,255,.09);display:flex;flex-direction:column;gap:7px">
+<div style="display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;border-radius:50%;background:oklch(0.68 0.15 150);flex:none"></span><span style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.05em">BASE-1</span><span style="margin-left:auto;font:400 10px/1 'IBM Plex Mono',monospace;color:#96968C">21:04</span></div>
+<div style="font:500 16px/1.35 Archivo;text-wrap:pretty">Copy. Truck dispatched, ETA forty minutes.</div>
+</div>
+<div style="padding:15px 0;border-bottom:1px solid rgba(255,255,255,.09);display:flex;flex-direction:column;gap:7px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font:700 11px/1 'IBM Plex Mono',monospace;letter-spacing:.07em;color:oklch(0.72 0.17 30)">FIRE</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.05em;color:#B8B8AE">R-05</span><span style="margin-left:auto;font:400 10px/1 'IBM Plex Mono',monospace;color:#96968C">20:41</span></div>
+<div style="font:500 16px/1.35 Archivo;text-wrap:pretty">Grass fire near the ridge road, contained, monitoring.</div>
+<div style="font:400 10px/1 'IBM Plex Mono',monospace;color:#96968C">MATUPE · PHOTO 68% RECEIVED</div>
+</div>
+</div>
+</div>
+<div style="width:360px;font:400 11.5px/1.5 Archivo;color:#5A5A52;text-wrap:pretty"><strong style="font-weight:600;color:#141412">Channel.</strong> Reached from home, so it needs no bottom nav — READY at top-left is the only way back, and it is always there. Inbound image decode shows as plain progress.</div>
+</div>
+
+<div style="flex:none;display:flex;flex-direction:column;gap:9px">
+<div style="width:360px;height:640px;background:oklch(0.32 0.14 28);border:1px solid rgba(0,0,0,.4);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;color:#fff">
+<div style="height:24px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font:500 9.5px/1 'IBM Plex Mono',monospace;color:rgba(255,255,255,.55)"><span>21:16</span><span>NO SIM · BATT 48%</span></div>
+<div style="flex:1;padding:36px 22px 0;display:flex;flex-direction:column">
+<div style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(255,255,255,.7);margin-bottom:22px">KEEP HOLDING</div>
+<div style="font:700 40px/1.05 Archivo;letter-spacing:-.01em;margin-bottom:26px;text-wrap:pretty">Broadcasting distress in 2</div>
+<div style="height:10px;border-radius:5px;background:rgba(255,255,255,.22);overflow:hidden;margin-bottom:30px"><div style="width:38%;height:10px;background:#fff"></div></div>
+<div style="display:flex;flex-direction:column;gap:13px">
+<div style="display:flex;justify-content:space-between"><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(255,255,255,.6)">CALL SIGN</span><span style="font:500 10.5px/1 'IBM Plex Mono',monospace">{{ callSign }}</span></div>
+<div style="display:flex;justify-content:space-between"><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(255,255,255,.6)">POSITION</span><span style="font:500 10.5px/1 'IBM Plex Mono',monospace">7.8903, 125.2914</span></div>
+<div style="display:flex;justify-content:space-between"><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(255,255,255,.6)">REPEATS</span><span style="font:500 10.5px/1 'IBM Plex Mono',monospace">EVERY 60 S UNTIL STOPPED</span></div>
+</div>
+</div>
+<div style="flex:none;padding:0 22px 26px;display:flex;flex-direction:column;gap:14px">
+<div style="font:400 12.5px/1.5 Archivo;color:rgba(255,255,255,.78);text-wrap:pretty">While distress repeats, the app cannot listen for incoming messages. Use the radio for voice.</div>
+<div style="height:58px;border-radius:8px;border:1.5px solid rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font:700 16px/1 Archivo">LIFT FINGER TO CANCEL</div>
+</div>
+</div>
+<div style="width:360px;font:400 11.5px/1.5 Archivo;color:#5A5A52;text-wrap:pretty"><strong style="font-weight:600;color:#141412">Distress hold.</strong> Hold-to-send makes a pocket trigger impossible while needing no confirm dialog. It states the cost — repeating means not listening — in the same breath.</div>
+</div>
+
+</div>
+
+<sc-if value="{{ showAnnotations }}" hint-placeholder-val="{{ true }}">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:22px;margin-top:28px;padding-top:24px;border-top:1px solid rgba(0,0,0,.10)">
+<div><div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B6B64;margin-bottom:9px">PRIMARY ACTION</div><div style="font:400 13px/1.55 Archivo;color:#3C3C36;text-wrap:pretty">Home: send a quick message. Everything else on that screen is deliberately smaller than it. Two destinations means the back path is a single fixed word, not a stack.</div></div>
+<div><div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B6B64;margin-bottom:9px">DEFAULT VS TUCKED AWAY</div><div style="font:400 13px/1.55 Archivo;color:#3C3C36;text-wrap:pretty">Home shows no message content at all — only a count. That is the aggressive bet here. Beaconing's timed mode, call sign, and radio link setup all live in Setup; only the one-shot beacon is surfaced.</div></div>
+<div><div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B6B64;margin-bottom:9px">STATUS MODEL</div><div style="font:400 13px/1.55 Archivo;color:#3C3C36;text-wrap:pretty">One line, top of home, same grammar as the other two. The night palette exists so the status dot and the distress slab are the only bright things on screen — nothing else competes at 21:00 on a ridge.</div></div>
+<div><div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.1em;color:#6B6B64;margin-bottom:9px">TRADEOFF</div><div style="font:400 13px/1.55 Archivo;color:#3C3C36;text-wrap:pretty">It contradicts assumption <span style="font:600 11px/1 'IBM Plex Mono',monospace">A1</span>: if responders actually live in the feed, this adds a tap to every read and will annoy them daily. Distress also has no precedent in the requirements — it needs MDRRMO protocol sign-off before it is a feature and not a liability.</div></div>
+</div>
+</sc-if>
+</div>
+</div>
+
+</div>
+
+<p style="margin:26px 0 0;font:400 12.5px/1.6 Archivo;color:rgba(0,0,0,.55);max-width:900px;text-wrap:pretty">Try next: "go with <a href="#1b">1b</a> but use <a href="#1a">1a</a>'s single feed" · "build out <a href="#1a">1a</a> fully — search/filter, beaconing, call sign, image send" · "make <a href="#1c">1c</a>'s home the launch screen of <a href="#1b">1b</a>" · "show me the beaconing screen three ways"</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;callSign&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;R-07&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Content&quot;},&quot;showAnnotations&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Review layer&quot;},&quot;showNavDiagrams&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Review layer&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      callSign: this.props.callSign ?? "R-07",
+      showAnnotations: this.props.showAnnotations ?? true,
+      showNavDiagrams: this.props.showNavDiagrams ?? true,
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,2 @@
+# APRS packet parser only. Dire Wolf is a separately installed external modem.
+aprslib==0.7.2

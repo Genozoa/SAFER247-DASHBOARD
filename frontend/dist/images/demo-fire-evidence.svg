@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" role="img" aria-labelledby="title description">
+  <title id="title">Fictional demo fire-scene illustration</title>
+  <desc id="description">A simple illustrated building and flame, marked as demo data.</desc>
+  <rect width="640" height="360" fill="#fff3e8"/>
+  <rect y="270" width="640" height="90" fill="#e7d5c2"/>
+  <path d="M170 270V145l95-65 95 65v125z" fill="#cbd5e1" stroke="#475569" stroke-width="8"/>
+  <path d="M145 150l120-82 120 82" fill="none" stroke="#475569" stroke-width="12" stroke-linejoin="round"/>
+  <rect x="205" y="185" width="48" height="48" fill="#93c5fd"/>
+  <rect x="278" y="185" width="48" height="48" fill="#93c5fd"/>
+  <path d="M440 266c-35-32-3-63 7-94 24 20 34 44 26 65 21-16 30-39 24-62 45 42 44 91-1 116-21 12-42 9-56-25z" fill="#ef4444"/>
+  <path d="M458 270c-17-19 0-36 9-53 13 14 14 26 9 37 15-6 19-17 18-27 21 24 12 50-8 57-12 4-21-1-28-14z" fill="#f59e0b"/>
+  <rect x="22" y="22" width="238" height="42" rx="8" fill="#7f1d1d"/>
+  <text x="40" y="50" fill="#fff" font-family="Arial, sans-serif" font-size="20" font-weight="700">DEMO - FICTIONAL SCENE</text>
+</svg>
