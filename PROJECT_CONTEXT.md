@@ -245,78 +245,12 @@ to conflict:
 
 ## Current Development Status
 
-The repository currently contains a React/Vite Command Center front end under
-`frontend/`. It provides Dashboard, Messaging, Map View, Reports, and Settings
-screens. A FastAPI backend and PostgreSQL/PostGIS persistence layer are
-implemented under `backend/`.
+The codebase contains React/Vite frontend and FastAPI backend with PostgreSQL/PostGIS. The main capabilities cover Dashboard, Messaging, Map View, Reports, Settings, authenticated radio APIs, and an independent APRS/SSTV radio worker.
 
-### Run the dashboard locally
+The current operational interface requires backend API/database access. New staff accounts require a private developer registration code and administrator approval. Roles distinguish viewer, operator and administrator privileges. The demo is a database-only account with isolated synthetic records, not a frontend fallback.
 
-From the repository root, start the Vite development server:
+Officer tracking displays recent APRS radio positions. Their claimed callsigns are not cryptographically authenticated. SSTV PD90 images require explicit reviewed correlation to an incident; no automatic recency pairing.
 
-```powershell
-cd frontend
-npm install
-npm run dev
-```
+The map supports a local authenticated tile route, requiring preloaded licensed tiles for offline street-map display. Radio hardware and the field Android application remain unverified in this repository.
 
-Open `http://localhost:3000` in a browser. By default, Vite development mode
-uses demo data and local demo sign-in/sign-out behavior, so the dashboard can
-be viewed without starting the backend or database. Demo sign-in does not
-verify credentials or persist accounts. To use real authentication and
-database-backed operational data, configure and start the backend and database
-as described in `backend/database/README.md`.
-
-The default development operational data source is a set of fictional
-front-end demo records in `frontend/src/data/demoData.js`, exposed through
-`frontend/src/data/operationalData.js`. The application prominently labels this
-content as **DEMO DATA — NOT LIVE DRRMO DATA**. Demo records are for interface
-demonstration only and are not official, current, or representative San
-Fernando DRRMO incident data. In API mode, the application uses the backend
-operational endpoints; this is not a connection to a live DRRMO source.
-
-### Implemented in the front end
-
-- Dashboard metrics and visualizations calculated from the selected incident
-  records.
-- Incident search and filters on the map and reports screens.
-- Map markers and a KDE heatmap built from filtered incident records that have
-  valid latitude and longitude coordinates. Every mapped record contributes
-  one point. Barangay counts in the heatmap panel are calculated from those
-  same mappable records; no fixed hotspot counts or locations are added.
-- Report downloads in CSV, XLSX, and PDF formats from the filtered report
-  records. Exported rows include a data-source field so demo records remain
-  identifiable outside the application.
-- A notice that image enhancement is under development. Image processing and
-  storage are not implemented.
-- Demo messaging is local UI behavior; in API mode, broadcast text is queued
-  for APRS processing. Jobs remain queued unless radio processing is enabled
-  and the API-managed background worker is running. WAV generation or audio
-  output does not verify RF delivery; live RF and Android interoperability
-  remain unverified.
-- Officer tracking has no live location feed.
-
-### Database and backend status
-
-`backend/database/schema.sql` defines a PostgreSQL/PostGIS schema, and
-`backend/database/README.md` documents how to create it. The schema contains no
-demo seed records. The backend exposes authentication and operational APIs and
-can connect to PostgreSQL/PostGIS when configured. The frontend defaults to
-demo data in Vite development mode; API mode requires the backend and database.
-
-### Authentication and access control
-
-The backend provides operator registration, login, session management, and
-server-side logout. These features require the backend and a configured
-database. In the default Vite development demo mode, sign-in/sign-out only
-change local UI state and do not verify credentials or persist accounts.
-Production use still requires deployment security review and an approved
-identity and access-control policy.
-
-### Planned or blocked integrations
-
-- Live incident and message data from the San Fernando DRRMO.
-- Production deployment and review of backend authentication and authorization.
-- RF message sending/receiving and responder location telemetry.
-- Image enhancement and durable storage of original/enhanced images.
-- Offline map imagery, which requires locally available/cached map tiles.
+See [docs/LDRRMO_DEPLOYMENT.md](docs/LDRRMO_DEPLOYMENT.md) and [docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md) for current implementation, migration, security, and verification status.
