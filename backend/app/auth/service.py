@@ -20,7 +20,7 @@ def register_operator(
     db: Session,
     username: str,
     password: str,
-) -> tuple[Operator, str]:
+) -> tuple[Operator, str | None]:
     fingerprint = password_fingerprint(password)
     if db.scalar(
         select(OperatorAuth.operator_id).where(

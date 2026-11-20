@@ -180,7 +180,7 @@ def _message_rows(db: Session, owner_id, limit: int = 500, offset: int = 0):
                 Message.sent_at,
                 Message.received_at,
                 Message.created_at,
-            ),
+            ).desc(),
             Message.id,
         ).limit(limit).offset(offset)
     )
