@@ -15,6 +15,7 @@ from app.main import create_app
 @pytest.fixture
 def auth_client(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("PASSWORD_FINGERPRINT_SECRET", "test-secret-key-".ljust(32, "x"))
+    monkeypatch.setenv("OPERATOR_REGISTRATION_CODE", "ci-test-only")
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -41,6 +42,7 @@ def register(client: TestClient, call_sign="DEMO-1", password="Strong!Pass9"):
         json={
             "call_sign": call_sign,
             "password": password,
+            "registration_code": "ci-test-only",
         },
     )
 
@@ -73,7 +75,9 @@ def test_register_login_logout_and_session_revocation(auth_client) -> None:
     assert response.status_code == 201
     assert response.json()["call_sign"] == "DEMO-1"
     assert "display_name" not in response.json()
-    assert response.headers["set-cookie"].lower().find("httponly") >= 0
+    assert "safer247_session" not in response.headers.get("set-cookie", "")
+    assert response.json()["approved"] is False
+    assert response.json()["role"] == "viewer"
     with factory() as session:
         auth_record = session.query(OperatorAuth).one()
         assert auth_record.password_fingerprint != "Strong!Pass9"
@@ -81,6 +85,14 @@ def test_register_login_logout_and_session_revocation(auth_client) -> None:
         assert operator.username == response.json()["call_sign"]
         assert operator.password_hash != "Strong!Pass9"
         assert "display_name" not in Operator.__table__.c
+    assert client.get("/api/auth/me").status_code == 401
+    assert client.post("/api/auth/login", json={"call_sign": "DEMO-1", "password": "Strong!Pass9"}).status_code == 403
+    with factory() as session:
+        account = session.query(Operator).one()
+        account.is_approved = True
+        account.role = "operator"
+        session.commit()
+    assert client.post("/api/auth/login", json={"call_sign": "DEMO-1", "password": "Strong!Pass9"}).status_code == 200
     assert client.get("/api/auth/me").json()["call_sign"] == "DEMO-1"
 
     client.post("/api/auth/logout")
@@ -112,6 +124,14 @@ def test_authenticated_operator_can_change_call_sign(auth_client) -> None:
     client, factory = auth_client
     assert register(client).status_code == 201
     assert register(client, "OTHER-1", "Other!Password8").status_code == 201
+    with factory() as session:
+        for account in session.query(Operator):
+            account.is_approved = True
+            account.role = "operator"
+        session.commit()
+    assert client.post("/api/auth/login", json={
+        "call_sign": "DEMO-1", "password": "Strong!Pass9"
+    }).status_code == 200
     duplicate = client.patch(
         "/api/auth/me/call-sign",
         json={"call_sign": "DEMO-1"},
@@ -160,3 +180,32 @@ def test_demo_seed_requires_explicit_opt_in_and_refuses_production(
     monkeypatch.setattr(sys, "argv", ["seed_demo", "--confirm-demo-seed"])
     with pytest.raises(SystemExit):
         seed_demo.main()
+
+
+def test_registration_requires_valid_in_person_code(auth_client):
+    client, factory = auth_client
+    invalid = client.post("/api/auth/register", json={
+        "call_sign": "OUTSIDE", "password": "Strong!Pass9",
+        "registration_code": "invalid",
+    })
+    assert invalid.status_code == 403
+    with factory() as session:
+        assert session.query(Operator).count() == 0
+
+
+def test_approved_account_revocation_disables_session(auth_client):
+    client, factory = auth_client
+    assert register(client).status_code == 201
+    with factory() as session:
+        account = session.query(Operator).one()
+        account.is_approved = True
+        account.role = "operator"
+        session.commit()
+    assert client.post("/api/auth/login", json={
+        "call_sign": "DEMO-1", "password": "Strong!Pass9",
+    }).status_code == 200
+    with factory() as session:
+        account = session.query(Operator).one()
+        account.is_approved = False
+        session.commit()
+    assert client.get("/api/auth/me").status_code == 401
