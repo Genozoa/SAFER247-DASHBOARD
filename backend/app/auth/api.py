@@ -186,6 +186,8 @@ def register(
     db: DBSession,
 ) -> OperatorView:
     verify_registration_code(payload.registration_code)
+    if payload.call_sign.casefold() == "demo":
+        raise HTTPException(status_code=409, detail="The Demo call sign is reserved.")
     _check_password(payload.password)
     fingerprint = password_fingerprint(payload.password)
     if db.scalar(
@@ -259,8 +261,8 @@ def update_call_sign(
     db: DBSession,
 ) -> OperatorView:
     operator = principal.operator
-    if operator.username == "Demo":
-        raise HTTPException(status_code=403, detail="Demo identity is fixed.")
+    if operator.username.casefold() == "demo" or payload.call_sign.casefold() == "demo":
+        raise HTTPException(status_code=403, detail="The Demo call sign is reserved.")
     other_operator = db.scalar(
         select(Operator.id).where(
             Operator.username == payload.call_sign,

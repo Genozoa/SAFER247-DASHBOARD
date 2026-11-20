@@ -190,7 +190,7 @@ export default function SettingsPage() {
                 className="settings-status-badge"
                 data-state={receiverBadgeState(workerStatus, radioStatusError)}
               >
-                {receiverStateLabel(dataSource, workerStatus, radioStatusError)}
+                {isDemo ? 'Disabled for Demo' : receiverStateLabel(dataSource, workerStatus, radioStatusError)}
               </span>
             </div>
           </div>
@@ -202,8 +202,8 @@ export default function SettingsPage() {
           <div className="settings-row">
             <span className="settings-row-label">Active input</span>
             <span className="settings-row-value">
-              {dataSource === 'demo'
-                ? 'Unavailable in demo mode'
+              {isDemo
+                ? 'Not available to Demo'
                 : workerStatus?.input_state === 'disabled'
                   ? 'Disabled'
                 : radioStatus?.worker?.input_device || 'Not selected'}

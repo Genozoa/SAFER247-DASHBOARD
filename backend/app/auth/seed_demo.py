@@ -20,6 +20,8 @@ def seed_demo_operator(
     call_sign: str,
     password: str,
 ) -> bool:
+    if call_sign != "Demo":
+        raise ValueError("The isolated sample dataset requires the exact call sign Demo.")
     errors = password_policy_errors(password)
     if errors:
         raise ValueError("Demo password must contain " + ", ".join(errors) + ".")

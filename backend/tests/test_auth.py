@@ -209,3 +209,13 @@ def test_approved_account_revocation_disables_session(auth_client):
         account.is_approved = False
         session.commit()
     assert client.get("/api/auth/me").status_code == 401
+
+
+def test_reserved_demo_call_sign_rejected(auth_client):
+    client, factory = auth_client
+    assert client.post("/api/auth/register", json={
+        "call_sign": "Demo", "password": "Strong!Pass9",
+        "registration_code": "ci-test-only",
+    }).status_code == 409
+    with factory() as session:
+        assert session.query(Operator).count() == 0
