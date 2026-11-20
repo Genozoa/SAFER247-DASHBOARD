@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from geoalchemy2 import Geometry
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import cast, func, literal, select
+from sqlalchemy import cast, func, literal, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.auth.api import CurrentPrincipal, CurrentSender
@@ -112,7 +112,7 @@ def _coordinate_text(latitude: float | None, longitude: float | None) -> str:
     return f"{latitude:.4f}, {longitude:.4f}"
 
 
-def _incident_rows(db: Session, limit: int = 500, offset: int = 0):
+def _incident_rows(db: Session, owner_id, limit: int = 500, offset: int = 0):
     latitude, longitude = _point_coordinates(db, IncidentReport.location)
     statement = (
         select(
@@ -127,6 +127,8 @@ def _incident_rows(db: Session, limit: int = 500, offset: int = 0):
         .outerjoin(Responder, IncidentReport.responder_id == Responder.id)
         .outerjoin(Barangay, IncidentReport.barangay_id == Barangay.id)
         .options(selectinload(IncidentReport.media_attachments))
+        .where(IncidentReport.sample_owner_operator_id == owner_id if owner_id is not None
+               else IncidentReport.sample_owner_operator_id.is_(None))
         .order_by(IncidentReport.reported_at.desc(), IncidentReport.id)
         .limit(limit).offset(offset)
     )
@@ -150,11 +152,11 @@ def _incident_view(row) -> IncidentView:
         text=report.details,
         status=report.status,
         has_image=bool(report.media_attachments),
-        data_source="database",
+        data_source="synthetic" if report.sample_owner_operator_id else "database",
     )
 
 
-def _message_rows(db: Session, limit: int = 500, offset: int = 0):
+def _message_rows(db: Session, owner_id, limit: int = 500, offset: int = 0):
     latitude, longitude = _point_coordinates(db, IncidentReport.location)
     statement = (
         select(Message, latitude, longitude)
@@ -171,6 +173,8 @@ def _message_rows(db: Session, limit: int = 500, offset: int = 0):
             ),
             joinedload(Message.incident_report).joinedload(IncidentReport.barangay),
         )
+        .where(Message.sample_owner_operator_id == owner_id if owner_id is not None
+               else Message.sample_owner_operator_id.is_(None))
         .order_by(
             func.coalesce(
                 Message.sent_at,
@@ -259,28 +263,28 @@ def _message_view(row) -> MessageView:
             {"filename": "PD90 image", "originalUrl": radio_view["original_url"], "enhancedUrl": radio_view["enhanced_url"]}
             if radio_view["original_url"] else None
         ),
-        data_source="database",
+        data_source="synthetic" if message.sample_owner_operator_id else "database",
     )
 
 
 @router.get("/incidents", response_model=list[IncidentView])
 def list_incidents(
-    _: CurrentPrincipal,
+    principal: CurrentPrincipal,
     db: DBSession,
     limit: int = Query(default=500, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ) -> list[IncidentView]:
-    return [_incident_view(row) for row in _incident_rows(db, limit, offset)]
+    return [_incident_view(row) for row in _incident_rows(db, principal.operator.id if principal.operator.username == "Demo" else None, limit, offset)]
 
 
 @router.get("/messages", response_model=list[MessageView])
 def list_messages(
-    _: CurrentPrincipal,
+    principal: CurrentPrincipal,
     db: DBSession,
     limit: int = Query(default=500, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ) -> list[MessageView]:
-    return [_message_view(row) for row in _message_rows(db, limit, offset)]
+    return [_message_view(row) for row in _message_rows(db, principal.operator.id if principal.operator.username == "Demo" else None, limit, offset)]
 
 
 @router.post("/messages", response_model=MessageView, status_code=201)

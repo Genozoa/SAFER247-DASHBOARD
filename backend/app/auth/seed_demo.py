@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 
@@ -47,6 +48,9 @@ def seed_demo_operator(
         operator = Operator(
             username=call_sign,
             password_hash=hash_password(password),
+            is_approved=True,
+            role="viewer",
+            approved_at=datetime.now(timezone.utc),
         )
         db.add(operator)
         db.flush()

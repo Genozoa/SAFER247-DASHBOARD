@@ -238,6 +238,10 @@ class Message(Base):
         ForeignKey("operators.id", name="fk_messages_sender_operator_id_operators"),
     )
     body: Mapped[str | None] = mapped_column(Text)
+    sample_owner_operator_id: Mapped[UUID | None] = mapped_column(
+        PostgreSQLUUID(as_uuid=True), ForeignKey("operators.id", ondelete="CASCADE"),
+        nullable=True,
+    )
     decoded_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     location: Mapped[Any | None] = mapped_column(
         Geography("POINT", srid=4326, spatial_index=False)
@@ -300,6 +304,10 @@ class IncidentReport(Base):
         PostgreSQLUUID(as_uuid=True),
         primary_key=True,
         server_default=text("gen_random_uuid()"),
+    )
+    sample_owner_operator_id: Mapped[UUID | None] = mapped_column(
+        PostgreSQLUUID(as_uuid=True), ForeignKey("operators.id", ondelete="CASCADE"),
+        nullable=True,
     )
     report_code: Mapped[str] = mapped_column(Text, nullable=False)
     source_message_id: Mapped[UUID | None] = mapped_column(
