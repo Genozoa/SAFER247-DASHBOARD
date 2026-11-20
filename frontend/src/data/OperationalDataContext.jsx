@@ -76,7 +76,9 @@ export function OperationalDataProvider({ children, operator }) {
   useEffect(() => {
     if (dataSource === 'demo') return undefined;
     refresh();
-    const timer = setInterval(() => refresh(true), 2500);
+    const timer = setInterval(() => {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') refresh(true);
+    }, 10000);
     return () => clearInterval(timer);
   }, [dataSource, refresh]);
 

@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from geoalchemy2 import Geometry
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import cast, func, literal, select
@@ -112,7 +112,7 @@ def _coordinate_text(latitude: float | None, longitude: float | None) -> str:
     return f"{latitude:.4f}, {longitude:.4f}"
 
 
-def _incident_rows(db: Session):
+def _incident_rows(db: Session, limit: int = 500, offset: int = 0):
     latitude, longitude = _point_coordinates(db, IncidentReport.location)
     statement = (
         select(
@@ -128,6 +128,7 @@ def _incident_rows(db: Session):
         .outerjoin(Barangay, IncidentReport.barangay_id == Barangay.id)
         .options(selectinload(IncidentReport.media_attachments))
         .order_by(IncidentReport.reported_at.desc(), IncidentReport.id)
+        .limit(limit).offset(offset)
     )
     return db.execute(statement).all()
 
@@ -153,7 +154,7 @@ def _incident_view(row) -> IncidentView:
     )
 
 
-def _message_rows(db: Session):
+def _message_rows(db: Session, limit: int = 500, offset: int = 0):
     latitude, longitude = _point_coordinates(db, IncidentReport.location)
     statement = (
         select(Message, latitude, longitude)
@@ -177,7 +178,7 @@ def _message_rows(db: Session):
                 Message.created_at,
             ),
             Message.id,
-        )
+        ).limit(limit).offset(offset)
     )
     return db.execute(statement).all()
 
@@ -266,16 +267,20 @@ def _message_view(row) -> MessageView:
 def list_incidents(
     _: CurrentPrincipal,
     db: DBSession,
+    limit: int = Query(default=500, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
 ) -> list[IncidentView]:
-    return [_incident_view(row) for row in _incident_rows(db)]
+    return [_incident_view(row) for row in _incident_rows(db, limit, offset)]
 
 
 @router.get("/messages", response_model=list[MessageView])
 def list_messages(
     _: CurrentPrincipal,
     db: DBSession,
+    limit: int = Query(default=500, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
 ) -> list[MessageView]:
-    return [_message_view(row) for row in _message_rows(db)]
+    return [_message_view(row) for row in _message_rows(db, limit, offset)]
 
 
 @router.post("/messages", response_model=MessageView, status_code=201)
