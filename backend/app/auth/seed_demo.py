@@ -20,8 +20,6 @@ def seed_demo_operator(
     call_sign: str,
     password: str,
 ) -> bool:
-    if call_sign != "Demo":
-        raise ValueError("The isolated sample dataset requires the exact call sign Demo.")
     errors = password_policy_errors(password)
     if errors:
         raise ValueError("Demo password must contain " + ", ".join(errors) + ".")
@@ -83,6 +81,8 @@ def main() -> int:
 
     call_sign = os.environ.get("DEMO_OPERATOR_CALL_SIGN", "").strip()
     password = os.environ.get("DEMO_OPERATOR_PASSWORD", "")
+    if call_sign and call_sign != "Demo":
+        parser.error("Set DEMO_OPERATOR_CALL_SIGN=Demo for the isolated sample dataset.")
     if not call_sign or not password:
         parser.error(
             "Set DEMO_OPERATOR_CALL_SIGN and DEMO_OPERATOR_PASSWORD first."
