@@ -83,6 +83,7 @@ export default function LeafletMap({
   const sourceRef = useRef('google');
   const revisionRef = useRef(0);
   const retryAfterRef = useRef(0);
+  const handledFailureRevisionRef = useRef(-1);
   const fallbackHandlerRef = useRef(null);
   const unmountedRef = useRef(false);
   const isBasemapUnavailable = basemapStatus?.kind === 'unavailable';
@@ -132,7 +133,10 @@ export default function LeafletMap({
       if (revision !== revisionRef.current || source !== sourceRef.current) return;
       // A failed entire tile batch is stronger evidence than navigator.onLine.
       if (errors > 0 && loaded === 0) {
-        fallbackHandlerRef.current?.(source, revision);
+        if (handledFailureRevisionRef.current !== revision) {
+          handledFailureRevisionRef.current = revision;
+          fallbackHandlerRef.current?.(source, revision);
+        }
       } else if (errors > 0) {
         setBasemapStatus({
           kind: 'partial', message: source === 'google'
@@ -152,6 +156,7 @@ export default function LeafletMap({
     const map = mapInstanceRef.current;
     if (!map || unmountedRef.current) return;
     const revision = ++revisionRef.current;
+    handledFailureRevisionRef.current = -1;
     if (baseTileLayerRef.current) map.removeLayer(baseTileLayerRef.current);
     sourceRef.current = source;
     setTileSource(source);
@@ -250,19 +255,22 @@ export default function LeafletMap({
     const controller = new AbortController();
     const probe = async () => {
       const map = mapInstanceRef.current;
-      if (checking || !map || sourceRef.current !== 'offline' ||
-          Date.now() < retryAfterRef.current) return;
+      const needsRecovery = sourceRef.current === 'offline' ||
+        (sourceRef.current === 'google' && basemapStatus?.kind === 'unavailable');
+      if (checking || !map || !needsRecovery || Date.now() < retryAfterRef.current) return;
       checking = true;
       const style = mapStyleRef.current;
+      const source = sourceRef.current;
       const result = await tileProbe(
         `/api/maps/google/${style}/tiles/${currentTile(map)}`,
         controller.signal
       );
       checking = false;
-      if (stopped || unmountedRef.current || sourceRef.current !== 'offline' ||
+      if (stopped || unmountedRef.current || sourceRef.current !== source ||
           style !== mapStyleRef.current) return;
-      if (result.ok) replaceBaseLayer('google', style);
-      else if (['authorization', 'quota', 'configuration'].includes(result.reason)) {
+      if (result.ok) {
+        replaceBaseLayer('google', style);
+      } else if (['authorization', 'quota', 'configuration'].includes(result.reason)) {
         retryAfterRef.current = Date.now() + PROVIDER_RETRY_MS;
       }
     };
@@ -275,7 +283,7 @@ export default function LeafletMap({
       window.clearInterval(interval);
       window.removeEventListener('online', onOnline);
     };
-  }, [isMapReady, tileProbe, currentTile, replaceBaseLayer]);
+  }, [isMapReady, basemapStatus?.kind, tileProbe, currentTile, replaceBaseLayer]);
 
   // Google requires viewport-dependent copyright text in addition to brand
   // attribution; update it when the map moves or changes styles.
@@ -301,10 +309,10 @@ export default function LeafletMap({
       }).then((data) => {
         if (data.copyright) setGoogleAttribution(data.copyright);
       }).catch((error) => {
-        if (error.name !== 'AbortError') setGoogleAttribution('Map data © Google and providers');
+        if (error.name !== 'AbortError') setGoogleAttribution('Map data attribution temporarily unavailable');
       });
     };
-    setGoogleAttribution('Map data © Google and providers');
+    setGoogleAttribution('Map data attribution loading');
     updateCopyright();
     map.on('moveend', updateCopyright);
     return () => {
@@ -921,7 +929,7 @@ export default function LeafletMap({
       {tileSource === 'google' && (
         <div className="google-map-attribution" role="note">
           <strong>Google Maps</strong>
-          <span>{googleAttribution || 'Map data © Google and providers'}</span>
+          <span>{googleAttribution || 'Map data attribution loading'}</span>
         </div>
       )}
 
