@@ -1,3 +1,5 @@
+-- Historical baseline schema snapshot. For existing databases, use Alembic upgrade head (currently 0008).
+-- DO NOT apply this file over a populated database.
 BEGIN;
 
 CREATE TABLE alembic_version (

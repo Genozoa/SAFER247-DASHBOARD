@@ -1,6 +1,4 @@
 import hashlib
-import hmac
-import os
 import re
 import secrets
 
@@ -13,10 +11,6 @@ load_environment()
 
 _PASSWORD_HASHER = PasswordHasher()
 _DUMMY_PASSWORD_HASH = _PASSWORD_HASHER.hash(secrets.token_urlsafe(32))
-
-
-class PasswordConfigurationError(RuntimeError):
-    pass
 
 
 def password_policy_errors(password: str) -> list[str]:
@@ -45,18 +39,6 @@ def verify_password(password: str, password_hash: str | None) -> bool:
     except (InvalidHashError, VerificationError, VerifyMismatchError):
         return False
 
-
-def password_fingerprint(password: str) -> str:
-    secret = os.environ.get("PASSWORD_FINGERPRINT_SECRET", "")
-    if len(secret.encode("utf-8")) < 32:
-        raise PasswordConfigurationError(
-            "PASSWORD_FINGERPRINT_SECRET must contain at least 32 bytes."
-        )
-    return hmac.new(
-        secret.encode("utf-8"),
-        password.encode("utf-8"),
-        hashlib.sha256,
-    ).hexdigest()
 
 
 def create_session_token() -> str:

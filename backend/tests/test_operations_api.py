@@ -15,7 +15,7 @@ from app.main import create_app
 def operations_client():
     db = Mock()
     db.get_bind.return_value.dialect.name = "sqlite"
-    operator = SimpleNamespace(id=uuid4(), username="COMMAND-1")
+    operator = SimpleNamespace(id=uuid4(), username="COMMAND-1", role="operator")
     principal = SimpleNamespace(operator=operator)
     app = create_app()
     app.dependency_overrides[get_db_session] = lambda: db
@@ -38,6 +38,7 @@ def test_list_incidents_maps_database_fields_to_frontend_shape(
         details="Water level rising.",
         status="received",
         media_attachments=[object()],
+        sample_owner_operator_id=None,
     )
     db.execute.return_value.all.return_value = [
         (report, "Flood", "UNIT-2", "Halapitan", 7.9186, 125.3286)
@@ -77,6 +78,7 @@ def test_list_messages_maps_incoming_report_fields(operations_client) -> None:
         received_at=received_at,
         created_at=received_at,
         transmission_status="received",
+        sample_owner_operator_id=None,
     )
     db.execute.return_value.all.return_value = [(message, 7.8998, 125.392)]
 
@@ -105,6 +107,7 @@ def test_list_messages_includes_radio_status_and_attempt_history(operations_clie
         received_at=None,
         created_at=attempted_at,
         transmission_status="sending",
+        sample_owner_operator_id=None,
         decoded_payload={"radio_lab": {"version": 1, "stage": "sending", "kind": "text"}},
         media_attachments=[],
         transmission_attempts=[
@@ -162,3 +165,11 @@ def test_queue_message_rejects_blank_content(operations_client) -> None:
     assert response.status_code == 422
     db.add.assert_not_called()
     db.commit.assert_not_called()
+
+
+def test_demo_account_is_denied_radio_queue(operations_client):
+    client, db, operator = operations_client
+    operator.username = "Demo"
+    response = client.post("/api/operations/messages", json={"content": "Do not transmit."})
+    assert response.status_code == 403
+    db.add.assert_not_called()

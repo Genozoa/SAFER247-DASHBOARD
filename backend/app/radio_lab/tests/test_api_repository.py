@@ -43,7 +43,7 @@ def api_client(tmp_path):
 
 def authenticate(app):
     app.dependency_overrides[current_principal] = lambda: SimpleNamespace(
-        operator=SimpleNamespace(id=uuid4(), username="TEST"))
+        operator=SimpleNamespace(id=uuid4(), username="TEST", role="operator"))
 
 
 @pytest.mark.parametrize("path,method", [
@@ -440,7 +440,7 @@ def test_postgis_authenticated_api_queues_without_audio_processing(postgres_radi
             yield db
     app.dependency_overrides[get_db_session] = database
     app.dependency_overrides[get_radio_settings] = lambda: settings
-    app.dependency_overrides[current_principal] = lambda: SimpleNamespace(operator=SimpleNamespace(id=operator_id))
+    app.dependency_overrides[current_principal] = lambda: SimpleNamespace(operator=SimpleNamespace(id=operator_id, role="operator"))
     def no_subprocess(*args, **kwargs):
         raise AssertionError("Request handlers must not process audio")
     monkeypatch.setattr("subprocess.run", no_subprocess)

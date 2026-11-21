@@ -17,7 +17,6 @@ import {
   DATE_RANGE_OPTIONS,
   normalizeBarangay,
 } from '../../data/referenceData';
-import { LIVE_OFFICERS } from '../../data/operationalData';
 import { useOperationalData } from '../../data/OperationalDataContext';
 import {
   filterIncidentRecords,
@@ -29,7 +28,7 @@ export default function MapViewPage() {
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { incidents } = useOperationalData();
+  const { incidents, officers } = useOperationalData();
   const initialMode = searchParams.get('mode') || location?.state?.mode || 'Markers';
   const incidentIdParam = searchParams.get('incident') || location?.state?.selectedIncidentId;
   const initialTypeParam = searchParams.get('type') || location?.state?.selectedType || 'All Types';
@@ -226,7 +225,7 @@ export default function MapViewPage() {
         <LeafletMap
           mode={mode}
           incidents={filteredIncidents}
-          officers={LIVE_OFFICERS}
+          officers={officers}
           selectedIncident={selectedIncident}
           selectedOfficer={selectedOfficer}
           selectedBarangay={selectedBarangay}
@@ -236,59 +235,15 @@ export default function MapViewPage() {
           showBreadcrumbs={showBreadcrumbs}
         />
 
-        {/* Officer Tracking "Not Available Yet" State Banner */}
         {mode === 'Tracking' && (
-          <div className="tracking-unavailable-card" role="status" aria-live="polite">
-            <div className="tracking-unavailable-icon">
-              <Navigation size={20} />
-            </div>
+          <div className="tracking-unavailable-card" role="status">
             <div className="tracking-unavailable-content">
-              <div className="tracking-unavailable-badge-row">
-                <span className="tracking-status-badge">
-                  Under Active Development
-                </span>
-                <span className="tracking-scope-badge">DRRMO Companion Mobile App</span>
-              </div>
-              <h4>Officer Live Tracking Integration Not Available Yet</h4>
+              <h4>{officers.length ? 'Recent responder radio positions' : 'No recent responder positions'}</h4>
               <p>
-                Live GPS location tracking is reserved for authenticated DRRMO field officers using the companion mobile app currently being developed by another team member. Once released, authorized field officers' real-time coordinates, breadcrumbs, and dispatch statuses will stream directly to this map.
+                {officers.length
+                  ? 'Positions originate from APRS radio traffic within the past 24 hours. APRS call signs are not authenticated. Treat these locations as unverified and confirm with personnel before dispatch.'
+                  : 'No position beacons were received in the past 24 hours. Tracking is not continuous without responder radio or companion-app updates.'}
               </p>
-              <div className="tracking-features-list">
-                <div className="tracking-feature-item">
-                  <span className="tracking-feature-bullet" />
-                  <span>Authenticated DRRMO Officer GPS</span>
-                </div>
-                <div className="tracking-feature-item">
-                  <span className="tracking-feature-bullet" />
-                  <span>Secure Municipal Dispatch Telemetry</span>
-                </div>
-                <div className="tracking-feature-item">
-                  <span className="tracking-feature-bullet" />
-                  <span>Real-time On-Scene Patrol Breadcrumbs</span>
-                </div>
-                <div className="tracking-feature-item">
-                  <span className="tracking-feature-bullet" />
-                  <span>Zero Simulated or Fabricated Signals</span>
-                </div>
-              </div>
-              <div className="tracking-unavailable-actions">
-                <button
-                  type="button"
-                  className="tracking-switch-btn"
-                  onClick={() => setMode('Markers')}
-                >
-                  <MapPin size={13} />
-                  <span>Switch to Incident Markers</span>
-                </button>
-                <button
-                  type="button"
-                  className="tracking-switch-btn secondary"
-                  onClick={() => setMode('Heatmap')}
-                >
-                  <Flame size={13} />
-                  <span>View Risk Heatmap</span>
-                </button>
-              </div>
             </div>
           </div>
         )}

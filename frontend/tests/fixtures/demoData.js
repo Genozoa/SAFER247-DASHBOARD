@@ -1,4 +1,4 @@
-import { BARANGAY_CENTROIDS } from './sanFernandoBoundary.js';
+import { BARANGAY_CENTROIDS } from '../../src/data/sanFernandoBoundary.js';
 
 const daysAgo = (days, hour = 10, minute = 30) => {
   const date = new Date();

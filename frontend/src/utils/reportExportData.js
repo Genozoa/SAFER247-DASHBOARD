@@ -24,7 +24,7 @@ export function buildReportExportRows(incidents) {
     incident.lng ?? '',
     incident.status || '',
     incident.text || '',
-    incident.dataSource === 'demo' ? 'DEMO - NOT LIVE DRRMO DATA' : 'Operational',
+    ['demo', 'synthetic'].includes(incident.dataSource) ? 'DEMO - NOT LIVE DRRMO DATA' : 'Operational',
   ]);
 }
 

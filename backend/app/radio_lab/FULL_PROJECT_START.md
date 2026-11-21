@@ -15,7 +15,8 @@ Dependencies, database data and radio drivers are installed on your own machine;
 they are not bundled inside this source archive.
 
 1. From the project root, copy .env.example to .env and configure DATABASE_URL
-   and PASSWORD_FINGERPRINT_SECRET with your own values.
+   and OPERATOR_REGISTRATION_CODE_HASH with your private values.
+   Generate the hash using python -m app.auth.registration_code from backend/.
 2. From backend/, create/activate a Python virtual environment and export the
    root configuration before installing dependencies/running migrations.
    Alembic does not automatically read the root .env file:
@@ -51,7 +52,7 @@ they are not bundled inside this source archive.
 5. From frontend/, install the lockfile dependencies, then start the UI:
 
        npm ci
-       VITE_OPERATIONAL_DATA_SOURCE=api npm run dev
+       npm run dev
 
    Open http://localhost:3000, then register/log in. In API mode, the normal
    Messaging composer queues APRS broadcast text. Authenticated

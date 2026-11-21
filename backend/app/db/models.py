@@ -38,6 +38,10 @@ class Operator(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("true")
     )
+    # Null only for existing accounts that have not yet verified the developer code.
+    registration_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -50,34 +54,9 @@ class Operator(Base):
     image_enhancements: Mapped[list["ImageEnhancement"]] = relationship(
         back_populates="operator"
     )
-    auth_metadata: Mapped["OperatorAuth | None"] = relationship(
-        back_populates="operator", cascade="all, delete-orphan", uselist=False
-    )
     auth_sessions: Mapped[list["AuthSession"]] = relationship(
         back_populates="operator", cascade="all, delete-orphan"
     )
-
-
-class OperatorAuth(Base):
-    __tablename__ = "operator_auth"
-    __table_args__ = (
-        UniqueConstraint(
-            "password_fingerprint", name="uq_operator_auth_password_fingerprint"
-        ),
-    )
-
-    operator_id: Mapped[UUID] = mapped_column(
-        PostgreSQLUUID(as_uuid=True),
-        ForeignKey(
-            "operators.id",
-            name="fk_operator_auth_operator_id_operators",
-            ondelete="CASCADE",
-        ),
-        primary_key=True,
-    )
-    password_fingerprint: Mapped[str] = mapped_column(Text, nullable=False)
-
-    operator: Mapped[Operator] = relationship(back_populates="auth_metadata")
 
 
 class AuthSession(Base):
@@ -235,6 +214,10 @@ class Message(Base):
         ForeignKey("operators.id", name="fk_messages_sender_operator_id_operators"),
     )
     body: Mapped[str | None] = mapped_column(Text)
+    sample_owner_operator_id: Mapped[UUID | None] = mapped_column(
+        PostgreSQLUUID(as_uuid=True), ForeignKey("operators.id", ondelete="CASCADE"),
+        nullable=True,
+    )
     decoded_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     location: Mapped[Any | None] = mapped_column(
         Geography("POINT", srid=4326, spatial_index=False)
@@ -297,6 +280,10 @@ class IncidentReport(Base):
         PostgreSQLUUID(as_uuid=True),
         primary_key=True,
         server_default=text("gen_random_uuid()"),
+    )
+    sample_owner_operator_id: Mapped[UUID | None] = mapped_column(
+        PostgreSQLUUID(as_uuid=True), ForeignKey("operators.id", ondelete="CASCADE"),
+        nullable=True,
     )
     report_code: Mapped[str] = mapped_column(Text, nullable=False)
     source_message_id: Mapped[UUID | None] = mapped_column(
@@ -436,6 +423,11 @@ class MediaAttachment(Base):
     file_name: Mapped[str] = mapped_column(Text, nullable=False)
     storage_path: Mapped[str] = mapped_column(Text, nullable=False)
     mime_type: Mapped[str] = mapped_column(Text, nullable=False)
+    # Every manual association records which approved operator confirmed it.
+    linked_by_operator_id: Mapped[UUID | None] = mapped_column(
+        PostgreSQLUUID(as_uuid=True), ForeignKey("operators.id", ondelete="SET NULL")
+    )
+    linked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     received_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

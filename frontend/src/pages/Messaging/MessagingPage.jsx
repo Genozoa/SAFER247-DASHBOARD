@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Image, MapPin, Send, RotateCw, AlertCircle, Search } from 'lucide-react';
 import { INCIDENT_TYPES } from '../../data/referenceData';
 import { useOperationalData } from '../../data/OperationalDataContext';
+import { useAuth } from '../../auth/AuthContext';
 import { formatDayDividerLabel, formatFullDateTimeTooltip, formatMessageTimestamp } from './messageTime.js';
 import { canRetryMessage, getMessageStatus } from './messageStatus.js';
 
@@ -41,6 +42,8 @@ function MessageTimestamp({ sentAt, currentTime }) {
 }
 
 export default function MessagingPage() {
+  const { operator } = useAuth();
+  const canTransmit = operator?.call_sign?.toLowerCase() !== 'demo';
   const [searchParams, setSearchParams] = useSearchParams();
   const {
     messages: transmissions,
@@ -141,7 +144,7 @@ export default function MessagingPage() {
   // Keep manually composed drafts visible without claiming they were transmitted.
   const handleTransmit = useCallback(async () => {
     const trimmed = messageText.trim();
-    if (!trimmed || isSending) return;
+    if (!trimmed || isSending || !canTransmit) return;
 
     setIsSending(true);
     setSendError('');
@@ -153,10 +156,10 @@ export default function MessagingPage() {
     } finally {
       setIsSending(false);
     }
-  }, [isSending, messageText, sendMessage]);
+  }, [isSending, messageText, sendMessage, canTransmit]);
 
   const handleRetry = useCallback(async (message) => {
-    if (!retryMessage || retryingMessageId) return;
+    if (!canTransmit || !retryMessage || retryingMessageId) return;
     if (message.status === 'delivery_unknown'
       && !window.confirm('Delivery is unknown. Retrying may send a duplicate. Continue?')) {
       return;
@@ -171,7 +174,7 @@ export default function MessagingPage() {
     } finally {
       setRetryingMessageId(null);
     }
-  }, [retryMessage, retryingMessageId]);
+  }, [retryMessage, retryingMessageId, canTransmit]);
 
   const now = useMemo(() => new Date(currentTime), [currentTime]);
 
@@ -344,7 +347,7 @@ export default function MessagingPage() {
                           <span className="message-status-label" aria-live="polite">{status.label}</span>
                           {status.detail && <small className="message-status-detail">{status.detail}</small>}
                         </div>
-                        {canRetryMessage(msg) && (
+                        {canTransmit && canRetryMessage(msg) && (
                           <button
                             type="button"
                             className="retry-action-btn"
@@ -387,17 +390,12 @@ export default function MessagingPage() {
       <div className="composer">
         {dataError && <p className="auth-alert" role="alert">{dataError}</p>}
         {sendError && <p className="auth-alert" role="alert">{sendError}</p>}
-        <button type="button" className="icon-action-btn" title="Attach Image" aria-label="Attach Image">
-          <Image size={18} />
-        </button>
-        <button type="button" className="icon-action-btn" title="Attach Location" aria-label="Attach Location">
-          <MapPin size={18} />
-        </button>
         <textarea
           ref={messageInputRef}
           rows={1}
-          placeholder="Broadcast to all units..."
+          placeholder={canTransmit ? "Broadcast to all units..." : "Demo account cannot transmit."}
           value={messageText}
+          disabled={!canTransmit}
           maxLength={MAX_MESSAGE_LENGTH}
           onChange={(e) => setMessageText(e.target.value)}
           onKeyDown={(e) => {
@@ -416,7 +414,7 @@ export default function MessagingPage() {
           <button
             type="button"
             className="transmit-btn"
-            disabled={!messageText.trim() || isSending}
+            disabled={!canTransmit || !messageText.trim() || isSending}
             onClick={handleTransmit}
             aria-label="Send broadcast message"
           >
@@ -424,7 +422,7 @@ export default function MessagingPage() {
             <Send size={15} />
           </button>
         </span>
-        <small>Shift+Enter inserts a new line. All sent messages are broadcast to all units.</small>
+        <small>{canTransmit ? 'Text-only APRS broadcast. Shift+Enter inserts a new line. All sent messages reach the outgoing radio queue; RF delivery is unconfirmed.' : 'Demo account: outgoing broadcasts are disabled.'}</small>
       </div>
     </div>
   );
