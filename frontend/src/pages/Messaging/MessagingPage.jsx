@@ -422,7 +422,7 @@ export default function MessagingPage() {
             <Send size={15} />
           </button>
         </span>
-        <small>{canTransmit ? 'Text-only APRS broadcast. Shift+Enter inserts a new line. All sent messages reach the outgoing radio queue; RF delivery is unconfirmed.' : 'Demo account: outgoing broadcasts are disabled.'}</small>
+        <small>{canTransmit ? 'Shift+Enter inserts a new line. All sent messages reach the outgoing radio queue; RF delivery is unconfirmed.' : 'Demo account: outgoing broadcasts are disabled.'}</small>
       </div>
     </div>
   );
