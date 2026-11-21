@@ -3,8 +3,6 @@ import L from 'leaflet';
 import {
   Layers,
   Map as MapIcon,
-  Satellite,
-  Mountain,
   LocateFixed,
   Maximize2,
   Eye,
@@ -12,7 +10,7 @@ import {
   Compass,
   Check,
   Building2,
-  WifiOff,
+  AlertCircle,
 } from 'lucide-react';
 import {
   SAN_FERNANDO_POBLACION,
@@ -25,50 +23,26 @@ import sanFernandoBarangaysGeoJson from './san-fernando-barangays.geojson';
 import { createKdeHeatmapLayer } from './KdeHeatmapLayer';
 import { getIncidentHeatmapPoints } from '../../utils/incidentData';
 
-// Google Maps style tile configurations (clean embedded cartography)
+// Standard interactive OSM tiles follow https://operations.osmfoundation.org/policies/tiles/
+// Never prefetch or cache them for offline use; the offline layer uses separately licensed local tiles.
 const TILE_LAYERS = {
+  default: {
+    name: 'Online',
+    icon: MapIcon,
+    description: 'OpenStreetMap streets and geographical features',
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    options: {
+      maxZoom: 19,
+      maxNativeZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>',
+    },
+  },
   offline: {
     name: 'Offline',
-    icon: MapIcon,
-    description: 'Local map tiles, usable without internet when the tile pack is installed',
+    icon: Layers,
+    description: 'Tiles stored locally by the LDRRMO for offline operations',
     url: '/api/maps/tiles/{z}/{x}/{y}.png',
     options: { maxZoom: 18, attribution: 'Locally provisioned offline tiles' },
-  },
-  default: {
-    name: 'Default',
-    icon: MapIcon,
-    description: 'Google Maps Roadmap with clean roads and natural topography',
-    url: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-    options: {
-      subdomains: ['0', '1', '2', '3'],
-      maxZoom: 20,
-      attribution: '&copy; Google Maps',
-      errorTileUrl: 'data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"/>',
-    },
-  },
-  satellite: {
-    name: 'Satellite',
-    icon: Satellite,
-    description: 'Google Maps High-Res Satellite Imagery with embedded road & town labels',
-    url: 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
-    options: {
-      subdomains: ['0', '1', '2', '3'],
-      maxZoom: 20,
-      attribution: '&copy; Google Maps Imagery',
-      errorTileUrl: 'data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"/>',
-    },
-  },
-  terrain: {
-    name: 'Terrain',
-    icon: Mountain,
-    description: 'Google Maps Topography & Hillshading with embedded contours',
-    url: 'https://mt{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',
-    options: {
-      subdomains: ['0', '1', '2', '3'],
-      maxZoom: 20,
-      attribution: '&copy; Google Maps Terrain',
-      errorTileUrl: 'data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"/>',
-    },
   },
 };
 
@@ -102,76 +76,102 @@ export default function LeafletMap({
   const municipalPolygonRef = useRef(null);
   const skipNextFlyToRef = useRef(false);
 
-  // Map settings and feature toggles
-  const [mapType, setMapType] = useState('offline'); // offline when provisioned; optional online layers
+  // Active base layer is online by default, independent of browser connectivity heuristics.
+  const [mapType, setMapType] = useState('default');
   const [showMunicipalBorder, setShowMunicipalBorder] = useState(true);
   const [showBarangayPolygons, setShowBarangayPolygons] = useState(true);
   const [kdeRadius, setKdeRadius] = useState(36);
   const [isMapReady, setIsMapReady] = useState(false);
   const [currentZoom, setCurrentZoom] = useState(11);
   const [allowedMinZoom, setAllowedMinZoom] = useState(10);
+  const [basemapStatus, setBasemapStatus] = useState(null);
+  const [noticeDismissed, setNoticeDismissed] = useState(false);
+  const mapTypeRef = useRef('default');
+  const fallbackAttemptedRef = useRef(false);
+  const onlineWorkedRef = useRef(false);
+  const tileSwitchSequenceRef = useRef(0);
+  const fallbackHandlerRef = useRef(null);
+  const isBasemapUnavailable = basemapStatus?.kind === 'unavailable';
 
-  // Offline fallback & tile error detection state
-  const [isOfflineFallback, setIsOfflineFallback] = useState(
-    typeof navigator !== 'undefined' ? !navigator.onLine : false
-  );
-  const [offlineNoticeDismissed, setOfflineNoticeDismissed] = useState(false);
-  const failedTilesCountRef = useRef(0);
-
-  // Listen to network status for immediate online recovery or offline fallback
+  // Connectivity events only retry the selected online layer. Tile success/failure
+  // determines availability; navigator.onLine alone does not.
   useEffect(() => {
-    const handleOnline = () => {
-      failedTilesCountRef.current = 0;
-      setIsOfflineFallback(false);
-      setOfflineNoticeDismissed(false);
-      if (baseTileLayerRef.current) {
-        baseTileLayerRef.current.redraw();
-      }
+    const retryOnline = () => {
+      if (mapTypeRef.current !== 'default') return;
+      fallbackAttemptedRef.current = false;
+      baseTileLayerRef.current?.redraw();
     };
-
-    const handleOffline = () => {
-      setIsOfflineFallback(true);
-      setOfflineNoticeDismissed(false);
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
+    window.addEventListener('online', retryOnline);
+    return () => window.removeEventListener('online', retryOnline);
   }, []);
 
-  // Safe Tile Layer Factory with error detection & offline fallback
+  // Count actual image successes and errors. Avoid an errorTileUrl, whose blank
+  // replacement image could otherwise be mistaken for a successful tile load.
   const createBaseTileLayer = useCallback((type, map) => {
     if (!map) return null;
     const config = TILE_LAYERS[type] || TILE_LAYERS.default;
-    const tileOptions = {
-      ...config.options,
-      errorTileUrl:
-        'data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"/>',
-    };
-    const layer = L.tileLayer(config.url, tileOptions);
+    const layer = L.tileLayer(config.url, config.options);
+    let failed = 0;
+    let loaded = 0;
 
-    layer.on('tileerror', () => {
-      failedTilesCountRef.current += 1;
-      if (failedTilesCountRef.current >= 3 || (typeof navigator !== 'undefined' && !navigator.onLine)) {
-        setIsOfflineFallback(true);
-      }
-    });
-
+    layer.on('tileerror', () => { failed += 1; });
     layer.on('tileload', () => {
-      if (failedTilesCountRef.current > 0) {
-        failedTilesCountRef.current = 0;
-      }
-      if (typeof navigator !== 'undefined' && navigator.onLine) {
-        setIsOfflineFallback(false);
+      loaded += 1;
+      if (type === mapTypeRef.current) {
+        if (type === 'default') onlineWorkedRef.current = true;
+        setBasemapStatus(null);
+        setNoticeDismissed(false);
       }
     });
-
+    layer.on('load', () => {
+      if (type !== mapTypeRef.current) return;
+      if (failed > 0 && loaded === 0) {
+        if (type === 'default' && !fallbackAttemptedRef.current) {
+          fallbackAttemptedRef.current = true;
+          fallbackHandlerRef.current?.('default');
+        } else if (type === 'offline' && onlineWorkedRef.current && !fallbackAttemptedRef.current) {
+          fallbackAttemptedRef.current = true;
+          fallbackHandlerRef.current?.('offline');
+        } else {
+          setBasemapStatus({
+            kind: 'unavailable',
+            message: type === 'offline'
+              ? 'Local offline tiles are missing or unavailable for this view. Boundaries and incident overlays remain available.'
+              : 'Online tiles could not be loaded, and no usable fallback is available. Boundaries and incident overlays remain available.',
+          });
+          setNoticeDismissed(false);
+        }
+      } else if (failed > 0) {
+        setBasemapStatus({
+          kind: 'partial',
+          message: type === 'offline'
+            ? 'Some local map tiles are missing at this zoom.'
+            : 'Some online map tiles failed to load.',
+        });
+        setNoticeDismissed(false);
+      }
+      failed = 0;
+      loaded = 0;
+    });
     layer.addTo(map);
     return layer;
+  }, []);
+
+  // A single local tile at the current center/zoom verifies that the local
+  // pack actually covers this view before replacing a working online layer.
+  const localTileAvailable = useCallback(async (map) => {
+    const zoom = Math.round(map.getZoom());
+    const projected = map.project(map.getCenter(), zoom);
+    const x = Math.floor(projected.x / 256);
+    const y = Math.floor(projected.y / 256);
+    try {
+      const response = await fetch(`/api/maps/tiles/${zoom}/${x}/${y}.png`, {
+        credentials: 'same-origin',
+      });
+      return response.ok && (response.headers.get('content-type') || '').includes('image/');
+    } catch {
+      return false;
+    }
   }, []);
 
   // Exact Bounding Box of SAN_FERNANDO_MUNICIPAL_BORDER
@@ -222,7 +222,7 @@ export default function LeafletMap({
     });
 
     // Add Base Tile Layer with offline detection
-    const baseLayer = createBaseTileLayer('offline', map);
+    const baseLayer = createBaseTileLayer('default', map);
     baseTileLayerRef.current = baseLayer;
 
     // Initialize Layer Groups in proper z-order
@@ -274,26 +274,42 @@ export default function LeafletMap({
     };
   }, [updateDynamicMinZoom, createBaseTileLayer]);
 
-  // Switch Base Tile Layer (Default, Satellite, Terrain)
-  const switchMapType = useCallback(
-    (newType) => {
-      const map = mapInstanceRef.current;
-      if (!map) return;
+  // Switching never repeats automatically between two failed layers.
+  // If an offline pack is absent, keep the current map rather than showing blank tiles.
+  const switchMapType = useCallback(async (newType, { automatic = false } = {}) => {
+    const map = mapInstanceRef.current;
+    if (!map || !TILE_LAYERS[newType]) return;
+    const sequence = ++tileSwitchSequenceRef.current;
+    if (!automatic) fallbackAttemptedRef.current = false;
 
-      setMapType(newType);
+    if (newType === 'offline' && !(await localTileAvailable(map))) {
+      if (sequence !== tileSwitchSequenceRef.current) return;
+      setBasemapStatus({
+        kind: automatic ? 'unavailable' : 'partial',
+        message: automatic
+          ? 'Online tiles failed to load. No local offline tiles cover this map view. Boundaries and incident overlays remain available.'
+          : 'Offline tile pack missing or not covering this map view. The current basemap remains selected.',
+      });
+      setNoticeDismissed(false);
+      return;
+    }
+    if (sequence !== tileSwitchSequenceRef.current) return;
 
-      // Remove existing base layer
-      if (baseTileLayerRef.current) {
-        map.removeLayer(baseTileLayerRef.current);
-        baseTileLayerRef.current = null;
-      }
+    if (baseTileLayerRef.current) map.removeLayer(baseTileLayerRef.current);
+    mapTypeRef.current = newType;
+    setMapType(newType);
+    setBasemapStatus(null);
+    setNoticeDismissed(false);
+    baseTileLayerRef.current = createBaseTileLayer(newType, map);
+  }, [createBaseTileLayer, localTileAvailable]);
 
-      failedTilesCountRef.current = 0;
-      const newBase = createBaseTileLayer(newType, map);
-      baseTileLayerRef.current = newBase;
-    },
-    [createBaseTileLayer]
-  );
+  fallbackHandlerRef.current = (failedType) => {
+    if (failedType === 'default') {
+      void switchMapType('offline', { automatic: true });
+    } else if (failedType === 'offline') {
+      void switchMapType('default', { automatic: true });
+    }
+  };
 
   // Fit Entire San Fernando Lungsod (enclosing all 24 barangays)
   // Closest view with 12–20px space between the municipal border bounding box and map edges
@@ -338,8 +354,8 @@ export default function LeafletMap({
       color: '#ffffff',
       weight: 5,
       opacity: 0.95,
-      fillColor: isOfflineFallback ? '#ffffff' : '#ea4335',
-      fillOpacity: isOfflineFallback ? 0.92 : 0.035,
+      fillColor: isBasemapUnavailable ? '#ffffff' : '#ea4335',
+      fillOpacity: isBasemapUnavailable ? 0.92 : 0.035,
       interactive: false,
     });
     group.addLayer(whiteUnderlay);
@@ -363,7 +379,7 @@ export default function LeafletMap({
     group.addLayer(redOverlay);
 
     municipalPolygonRef.current = redOverlay;
-  }, [isMapReady, showMunicipalBorder, isOfflineFallback]);
+  }, [isMapReady, showMunicipalBorder, isBasemapUnavailable]);
 
   // Render 24 Barangay Boundaries from san-fernando-barangays.geojson
   // Clicking the area of the barangay highlights only its border in blue
@@ -720,91 +736,38 @@ export default function LeafletMap({
 
   return (
     <div className="leaflet-map-wrapper">
-      {/* Real Open-Source Leaflet Container with Offline Fallback Background */}
+      {/* Basemap failures do not hide the local municipal and barangay overlays. */}
       <div
         ref={mapContainerRef}
-        className={`leaflet-map-canvas ${isOfflineFallback ? 'offline-fallback-active' : ''}`}
-        style={
-          isOfflineFallback
-            ? {
-                backgroundColor: '#f1f5f9',
-                backgroundImage:
-                  'linear-gradient(to right, rgba(203, 213, 225, 0.45) 1px, transparent 1px), linear-gradient(to bottom, rgba(203, 213, 225, 0.45) 1px, transparent 1px)',
-                backgroundSize: '40px 40px',
-              }
-            : undefined
-        }
+        className={`leaflet-map-canvas ${isBasemapUnavailable ? 'offline-fallback-active' : ''}`}
+        style={isBasemapUnavailable ? {
+          backgroundColor: '#f1f5f9',
+          backgroundImage: 'linear-gradient(to right, rgba(203, 213, 225, 0.45) 1px, transparent 1px), linear-gradient(to bottom, rgba(203, 213, 225, 0.45) 1px, transparent 1px)',
+          backgroundSize: '40px 40px',
+        } : undefined}
       />
-
-      {/* Offline Basemap Notice */}
-      {isOfflineFallback && !offlineNoticeDismissed && (
-        <div
-          className="offline-map-fallback-banner"
-          style={{
-            position: 'absolute',
-            bottom: '72px',
-            left: '18px',
-            zIndex: 910,
-            background: 'rgba(255, 255, 255, 0.98)',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid #cbd5e1',
-            borderLeft: '4px solid #f59e0b',
-            borderRadius: '8px',
-            padding: '10px 14px',
-            boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
-            maxWidth: '380px',
-            fontSize: '12px',
-            color: '#334155',
-            lineHeight: 1.45,
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: '4px',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontWeight: 700,
-                color: '#0f172a',
-                fontSize: '12px',
-              }}
-            >
-              <WifiOff size={14} style={{ color: '#d97706' }} />
-              <span>Offline Mode — Vector Boundaries Active</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setOfflineNoticeDismissed(true)}
-              style={{
-                border: 0,
-                background: 'transparent',
-                color: '#94a3b8',
-                cursor: 'pointer',
-                fontSize: '16px',
-                lineHeight: 1,
-                padding: '0 2px',
-              }}
-              title="Dismiss notice"
-            >
-              ×
-            </button>
+      {basemapStatus && !noticeDismissed && (
+        <div className="offline-map-fallback-banner" role="status" style={{
+          position: 'absolute', bottom: '72px', left: '18px', zIndex: 910,
+          background: 'rgba(255, 255, 255, 0.98)', border: '1px solid #cbd5e1',
+          borderLeft: '4px solid #f59e0b', borderRadius: '8px', padding: '10px 14px',
+          boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)', maxWidth: '380px',
+          fontSize: '12px', color: '#334155', lineHeight: 1.45,
+        }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <AlertCircle size={16} aria-hidden="true" />
+            <strong>Basemap status</strong>
+            <button type="button" onClick={() => setNoticeDismissed(true)}
+              aria-label="Dismiss basemap notice" style={{
+                border: 0, marginLeft: 'auto', background: 'transparent',
+                cursor: 'pointer', fontSize: '18px', color: '#64748b',
+              }}>×</button>
           </div>
-          <div style={{ color: '#64748b', fontSize: '11px' }}>
-            Online base tiles are currently unreachable. The map is operating with locally bundled San
-            Fernando municipal boundaries, 24 barangays, and emergency data. Real offline map imagery
-            requires locally cached map tiles.
-          </div>
+          <div style={{ marginTop: '4px' }}>{basemapStatus.message}</div>
         </div>
       )}
 
-      {/* Google Maps Style Layer Switcher & Feature Toggles Bar */}
+      {/* Online / offline tile switcher and existing map feature toggles */}
       <div className="google-style-map-type-bar" role="group" aria-label="Map Type & Overlays">
         {Object.entries(TILE_LAYERS).map(([key, config]) => {
           const IconComponent = config.icon;
@@ -829,7 +792,7 @@ export default function LeafletMap({
             type="button"
             className={`map-layer-toggle-btn ${showMunicipalBorder ? 'active' : ''}`}
             onClick={() => setShowMunicipalBorder((prev) => !prev)}
-            title="Toggle Google Maps San Fernando Lungsod Municipal Border"
+            title="Toggle San Fernando municipal border"
           >
             <span style={{ color: showMunicipalBorder ? '#dc2626' : '#94a3b8', fontSize: '11px' }}>●</span>
             <span>Lungsod Border</span>
