@@ -165,3 +165,11 @@ def test_queue_message_rejects_blank_content(operations_client) -> None:
     assert response.status_code == 422
     db.add.assert_not_called()
     db.commit.assert_not_called()
+
+
+def test_demo_account_is_denied_radio_queue(operations_client):
+    client, db, operator = operations_client
+    operator.username = "Demo"
+    response = client.post("/api/operations/messages", json={"content": "Do not transmit."})
+    assert response.status_code == 403
+    db.add.assert_not_called()
