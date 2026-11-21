@@ -20,7 +20,7 @@ DECLARE
     longitude double precision;
     reported timestamptz;
 BEGIN
-    SELECT id INTO demo_id FROM operators WHERE username = 'Demo' AND is_approved = true AND role = 'viewer';
+    SELECT id INTO demo_id FROM operators WHERE username = 'Demo' AND registration_verified_at IS NOT NULL;
     IF demo_id IS NULL THEN
         RAISE EXCEPTION 'Create the approved viewer-only Demo operator using seed_demo first.';
     END IF;

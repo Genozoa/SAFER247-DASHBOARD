@@ -1,23 +1,23 @@
 """Browser session routing required by the authenticated radio API."""
 
 from fastapi.testclient import TestClient
+from argon2 import PasswordHasher
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 
 from app.auth.api import CurrentPrincipal, SESSION_COOKIE
-from app.db.models import AuthSession, Operator, OperatorAuth
+from app.db.models import AuthSession, Operator
 from app.db.session import create_session_factory, get_db_session
 from app.main import create_app
 
 
 def test_session_cookie_reaches_radio_and_operations_and_logout_clears_paths(monkeypatch):
-    monkeypatch.setenv("PASSWORD_FINGERPRINT_SECRET", "radio-cookie-test-secret".ljust(32, "x"))
-    monkeypatch.setenv("OPERATOR_REGISTRATION_CODE", "ci-test-only")
+    monkeypatch.setenv("OPERATOR_REGISTRATION_CODE_HASH", PasswordHasher().hash("ci-test-only"))
     engine = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
     Operator.metadata.create_all(
-        engine, tables=[Operator.__table__, OperatorAuth.__table__, AuthSession.__table__]
+        engine, tables=[Operator.__table__, AuthSession.__table__]
     )
     factory = create_session_factory(engine)
     app = create_app()
@@ -42,11 +42,6 @@ def test_session_cookie_reaches_radio_and_operations_and_logout_clears_paths(mon
             )
             assert registered.status_code == 201
             assert client.get("/api/radio/auth-cookie-probe").status_code == 401
-            with factory() as session:
-                operator = session.query(Operator).one()
-                operator.is_approved = True
-                operator.role = "operator"
-                session.commit()
             logged_in = client.post("/api/auth/login", json={
                 "call_sign": "N0CALL", "password": "Strong!Pass9",
             })

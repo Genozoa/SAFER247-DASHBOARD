@@ -36,6 +36,4 @@ jobs:
       - run: python -m pip install -r app/radio_lab/requirements.txt
       - run: python -m pytest -q
         env:
-          PASSWORD_FINGERPRINT_SECRET: test-ci-secret-replace-not-used-in-production-32
-          OPERATOR_REGISTRATION_CODE: ci-test-only
           RADIO_ENABLED: 'false'
