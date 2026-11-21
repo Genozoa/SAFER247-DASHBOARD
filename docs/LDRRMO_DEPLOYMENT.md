@@ -49,23 +49,27 @@ SSTV PD90 images have no authenticated incident metadata. They remain unlinked u
 
 `GET /api/operations/responders/locations` provides recent APRS positions, but radio call signs remain unverified. The Android companion is outside this repository; do not treat reported coordinates as authenticated field GPS.
 
-## Google basemap and automatic offline recovery
+## Online-first basemap and automatic offline recovery
 
-The React/Leaflet map uses the official Google Map Tiles API through authenticated FastAPI endpoints. It defaults to **Roadmap** and offers **Satellite** (unlabelled imagery) and **Terrain**. Manual Online/Offline controls are removed. Operational markers, all 24 barangay boundaries, municipal borders, and heatmaps remain separate Leaflet overlays.
+Like the original V11 interface, Leaflet starts with the online **Default** road map immediately. No Google Cloud account, Google Maps API key or billing is necessary.
 
-Google Cloud setup:
+- **Default:** OpenStreetMap standard road tiles (`https://tile.openstreetmap.org/`), with OpenStreetMap attribution. Use for normal interactive browsing under the [OSM tile policy](https://operations.osmfoundation.org/policies/tiles/). The public service has no availability guarantee, and its tiles must not be downloaded in bulk for offline use.
+- **Satellite:** NASA GIBS MODIS Terra true-colour imagery. This is lower resolution than street-level satellite photography and its dated images can be unavailable.
+- **Terrain:** OpenTopoMap-R hosted by openmaps.fr. Follow the [provider tile policy](https://openmaps.fr/tile-usage-policy.html); do not prefetch tiles.
 
-1. Create a Google Cloud project, attach an active billing account, and enable the **Map Tiles API**.
-2. Create an API key with an **API restriction** permitting only the Map Tiles API. If you restrict the key to backend server IP addresses, authorize the backend's actual public egress IP. Browser referrer restrictions are unsuitable for this server-side key.
-3. Add `GOOGLE_MAP_TILES_API_KEY=YOUR_KEY` **only to the private server/root .env**, then restart FastAPI. Never add the key to `VITE_*` variables, commit it, or embed it in frontend assets.
-4. Keep `OFFLINE_TILE_DIR` pointed at an independently licensed local XYZ tile set (`z/x/y.png`). Do **not** cache Google tiles for offline use.
+These layer buttons retain V11's familiar layout, but Google imagery is not included. Online tiles load in the browser from the individual providers with their attributions. No remote tile API key is configured on FastAPI.
 
-Roadmap sessions apply the official `poi` label visibility rule plus transit-station label hiding. Google does not offer equivalent JSON styling for Satellite or Terrain. Satellite renders without Google's roadmap label overlay; Terrain may contain labels that cannot be suppressed. The renderer displays **Google Maps** branding and requests viewport-dependent copyright metadata. Do not cover these attributions with operational UI.
+When an online tile batch fails, the map first tries the keyless Default layer if another style was selected. If that also fails, the frontend probes one local tile for the current center and zoom through the existing authenticated FastAPI route `/api/maps/tiles/{z}/{x}/{y}.png`. It switches to the offline tile pack only if a real image response is available. In the background, it checks online tile availability approximately every 45 seconds while the offline layer is active or the basemap is unavailable. A browser online event triggers the same verification, not a blind switch. No repeated loops between unavailable providers are permitted.
 
-When the online layer fails, the frontend checks an actual local tile at the current map position and zoom, then switches automatically to the local layer only if that tile exists. Every 45 seconds, or after a browser connectivity event, it checks a real Google image response and restores the user's selected Google style if successful. Authentication or quota failures use a longer 5-minute cooldown. If neither source works, the app retains local municipal/barangay vectors and shows an accurate basemap error. The app does not save or pre-download Google imagery.
+To enable actual offline maps, set `OFFLINE_TILE_DIR` to a separately licensed, locally provisioned XYZ directory using `z/x/y.png`, for example:
 
-Official provider docs: [session tokens](https://developers.google.com/maps/documentation/tile/session_tokens), [styling](https://developers.google.com/maps/documentation/tile/style-reference), [attribution policy](https://developers.google.com/maps/documentation/tile/policies), and [pre-fetching/caching limits](https://developers.google.com/maps/documentation/tile/policies).
+```dotenv
+OFFLINE_TILE_DIR=D:\\SAFER247\\offline-tiles
+```
 
+Without an offline pack or an available online provider, the local San Fernando municipality border, 24 barangay boundaries, incident markers, tracking and heatmap overlays remain visible with a concise basemap status notice. The local FastAPI route requires a valid user session. No radio hardware is necessary for map display.
+
+For dependable emergency operations, provision your own licensed offline map pack or a provider with an availability agreement. The public keyless services are not suitable as the sole guaranteed source for critical response.
 
 ## Development commands
 
