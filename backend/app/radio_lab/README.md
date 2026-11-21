@@ -40,6 +40,14 @@ transmissions are not accepted. Historical queued image jobs are retained but
 cannot be encoded or retried; old encoded WAV artifacts are retained and never
 automatically played.
 
+## TCP KISS prototype (opt-in)
+
+Live APRS can now use a persistent Dire Wolf TCP KISS connection instead of
+per-message `gen_packets` and rolling `atest` WAV windows. The default
+remains the original WAV path. For configuration, connection failure behavior,
+audio ownership, and transmission limitations see
+[aprs/README.md](aprs/README.md#optional-persistent-tcp-kiss-mode).
+
 ## Architecture and scope
 
 The outgoing APRS flow is web UI/API → committed PostgreSQL message/queue row

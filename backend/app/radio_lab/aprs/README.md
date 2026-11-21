@@ -6,6 +6,62 @@ at 1200 baud, and uses Dire Wolf `atest` to decode recorded audio. `aprslib`
 parses **already decoded packets**, never audio. No APRS-IS service is used.
 The shared radio worker calls these blocking functions in a separate process.
 
+## Optional persistent TCP KISS mode
+
+**Default stays `RADIO_APRS_TRANSPORT=wav`.** The original `gen_packets`,
+`atest`, WAV spool, radio output commands, and mixed-recording PD90 tests
+remain available. This implementation does not alter historical database data.
+
+Set these variables in your private root `.env` to opt in:
+
+```dotenv
+RADIO_ENABLED=true
+RADIO_APRS_TRANSPORT=kiss
+RADIO_KISS_HOST=127.0.0.1
+RADIO_KISS_PORT=8001
+RADIO_KISS_MANAGE_DIREWOLF=true
+RADIO_DIREWOLF_EXE=app/radio_lab/aprs/Tools/direwolf.exe
+RADIO_DIREWOLF_CONFIG=D:\\SAFER247\\direwolf-kiss.conf
+RADIO_KISS_SSTV_INPUT_ENABLED=false
+```
+
+First copy `direwolf-kiss.example.conf` to that private configuration
+path. Set `MYCALL` to your authorized station, configure an independent APRS
+audio interface through `ADEVICE`, and configure appropriate PTT. The example
+does not activate a real transmitter or authorize RF operation. Dire Wolf must
+be configured to offer KISS TCP on port 8001, normally its default. Set
+`RADIO_KISS_MANAGE_DIREWOLF=false` to use an externally supervised TNC.
+
+Python opens **only loopback** TCP KISS, uses bounded byte stuffing, converts
+APRS TNC2 to AX.25 UI (PID F0), and parses incoming text and positions through
+`aprslib`. A persistent listener retries disconnected sockets every two
+seconds and, in managed mode, restarts a terminated Dire Wolf child. The
+radio worker owns the child and stops it during shutdown. Status reports the
+KISS connection and codec capabilities.
+
+**Audio-device ownership:** Dire Wolf exclusively owns the APRS radio audio.
+Normal Python live audio capture stays disabled in KISS mode. For live SSTV
+PD90, set `RADIO_KISS_SSTV_INPUT_ENABLED=true` **only after configuring a
+different independently accessible `RADIO_INPUT_DEVICE` or a dedicated
+`RADIO_INPUT_COMMAND` PCM tap**. Do not make Dire Wolf and Python compete
+for the same exclusive sound device. Recorded WAV spool decoding of APRS/SSTV
+continues regardless. This implementation does not auto-create a sound-device
+fan-out, connect PTT hardware, or verify simultaneous physical APRS/PD90
+reception.
+
+**Delivery semantics:** TCP `sendall` only confirms local KISS submission.
+It cannot confirm RF airtime, digipeating, reception or delivery. The database
+records `delivery_unknown` after submission, and failures after an attempted
+send require an explicit operator retry. No automatic retransmission follows
+a reconnect or restart.
+
+When KISS is disconnected, outgoing queue rows remain queued. A connection
+can fail after an attempt begins, so such attempts remain `delivery_unknown`
+rather than being replayed automatically. Existing Demo restrictions apply.
+Keep `RADIO_OUTPUT_ENABLED=false` for connection/receive-only software
+checks and use a mock TCP KISS TNC for automated tests. Live transmitting is
+never part of the automated suite.
+
 ## Installation
 
 From `backend`, install the project's normal dependencies, then:

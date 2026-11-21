@@ -66,6 +66,8 @@ def status(_: CurrentRadioViewer, settings: Settings, request: Request):
     return {"enabled": settings.enabled, "station": settings.station,
             "backend": "direwolf-tcp-kiss+wav-spool" if kiss else "audio-device+wav-spool",
             "aprs_transport": settings.aprs_transport,
+            "kiss_state": worker.get("kiss_state", "disabled" if not kiss else "not-connected"),
+            "kiss_error": worker.get("kiss_error"),
             "worker": worker,
             "hardware_verified": False, "android_verified": False,
             "audio_output_configured": bool(

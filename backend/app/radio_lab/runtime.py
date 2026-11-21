@@ -170,7 +170,7 @@ def receiver_process(settings: RadioSettings, inputs, results) -> None:
     temp = settings.storage_dir / "listener-aprs.wav"
 
     def decode_aprs_buffer(warnings):
-        if not aprs_buffer:
+        if settings.aprs_transport == "kiss" or not aprs_buffer:
             return []
         with wave.open(str(temp), "wb") as wav:
             wav.setparams((1, 2, settings.sample_rate, 0, "NONE", "not compressed"))
@@ -214,13 +214,12 @@ def receiver_process(settings: RadioSettings, inputs, results) -> None:
                 pcm = item["pcm"]
                 sample_clock += len(pcm) / (2 * settings.sample_rate)
                 records = decoder.feed(pcm)
-                aprs_buffer.extend(pcm)
-                # Five-second windows with two seconds overlap preserve packets
-                # crossing listener boundaries; radio frames longer than this
-                # profile are not supported by the live APRS window decoder.
-                if len(aprs_buffer) >= settings.sample_rate * 2 * 5:
-                    records.extend(decode_aprs_buffer(warnings))
-                    del aprs_buffer[:-settings.sample_rate * 2 * 2]
+                if settings.aprs_transport != "kiss":
+                    aprs_buffer.extend(pcm)
+                    # WAV transport retains the original five-second APRS window.
+                    if len(aprs_buffer) >= settings.sample_rate * 2 * 5:
+                        records.extend(decode_aprs_buffer(warnings))
+                        del aprs_buffer[:-settings.sample_rate * 2 * 2]
             if not source:
                 for record in records:
                     record["receipt_id"] = f"live:{uuid4()}"
@@ -284,9 +283,16 @@ class RadioWorker:
         self.tx_results = context.Queue(maxsize=1)
         self.rx_inputs = context.Queue(maxsize=128)
         self.rx_results = context.Queue(maxsize=128)
-        self.processes = [
-            context.Process(target=encoder_process, args=(settings, self.tx_requests, self.tx_results), name="radio-encoder"),
-            context.Process(target=receiver_process, args=(settings, self.rx_inputs, self.rx_results), name="radio-decoder"),
+        self.processes = (
+            [context.Process(
+                target=encoder_process, args=(settings, self.tx_requests, self.tx_results),
+                name="radio-encoder",
+            )] if settings.aprs_transport == "wav" else []
+        ) + [
+            context.Process(
+                target=receiver_process, args=(settings, self.rx_inputs, self.rx_results),
+                name="radio-decoder",
+            ),
         ]
         self.capture_process = None
         self._capture_lock = threading.Lock()
@@ -577,7 +583,10 @@ class RadioWorker:
                         self.repository.fail(job["id"], str(error))
                     except Exception:
                         log.exception("Cannot persist failed transmission; startup recovery will mark it failed")
-                if isinstance(error, (TimeoutError, CodecProtocolError)) or (job and not self.processes[0].is_alive()):
+                if isinstance(error, (TimeoutError, CodecProtocolError)) or (
+                    job and self.settings.aprs_transport == "wav"
+                    and not self.processes[0].is_alive()
+                ):
                     # A late response must never be consumed as the next job's
                     # result. A supervised restart creates new IPC queues.
                     self.stop.set()
