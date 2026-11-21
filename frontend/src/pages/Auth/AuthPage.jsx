@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
+import { RadioTower, LockKeyhole, Eye, EyeOff, KeyRound } from 'lucide-react';
 import './auth.css';
 
 export default function AuthPage() {
@@ -11,6 +12,11 @@ export default function AuthPage() {
   const [callSign, setCallSign] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [registrationCode, setRegistrationCode] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [showRegistrationCode, setShowRegistrationCode] = useState(false);
+  const [needsLegacyVerification, setNeedsLegacyVerification] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -27,12 +33,17 @@ export default function AuthPage() {
     setSubmitting(true);
     try {
       if (isRegister) {
-        await register(callSign.trim(), password);
+        await register(callSign.trim(), password, registrationCode);
+        navigate('/login', { replace: true, state: { registrationCompleted: true } });
+        return;
       } else {
-        await login(callSign.trim(), password);
+        await login(callSign.trim(), password, needsLegacyVerification ? registrationCode : undefined);
       }
       navigate('/', { replace: true });
     } catch (requestError) {
+      if (!isRegister && requestError.message.includes('Existing account requires registration-code verification.')) {
+        setNeedsLegacyVerification(true);
+      }
       setError(requestError.message);
     } finally {
       setSubmitting(false);
@@ -51,57 +62,112 @@ export default function AuthPage() {
         <h1 id="auth-title">{isRegister ? 'Create operator account' : 'Operator sign in'}</h1>
         <p className="auth-description">
           {isRegister
-            ? 'Register with your call sign.'
+            ? 'Personnel registration requires a code supplied in person by the developer.'
             : 'Sign in to access the SAFER 247 command center.'}
         </p>
 
+        {isRegister && <div className="auth-warning" role="note">Authorized San Fernando LDRRMO personnel only. Never share your password or registration code.</div>}
+        {!isRegister && location.state?.registrationCompleted && <div className="auth-notice" role="status">Account created. Sign in with your call sign and password.</div>}
         {(serviceError || error) && (
           <div className="auth-alert" role="alert">{error || serviceError}</div>
         )}
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <label htmlFor="auth-call-sign">Call sign</label>
-          <input
-            id="auth-call-sign"
-            name="callSign"
-            autoComplete="username"
-            maxLength={64}
-            required
-            value={callSign}
-            onChange={(event) => setCallSign(event.target.value)}
-          />
+          <div className="auth-input-field">
+            <RadioTower className="auth-field-icon" size={19} aria-hidden="true" />
+            <input
+              id="auth-call-sign"
+              name="callSign"
+              autoComplete="username"
+              maxLength={64}
+              placeholder="Enter your call sign"
+              required
+              value={callSign}
+              onChange={(event) => setCallSign(event.target.value)}
+            />
+          </div>
 
           <label htmlFor="auth-password">Password</label>
-          <input
-            id="auth-password"
-            name="password"
-            type="password"
-            autoComplete={isRegister ? 'new-password' : 'current-password'}
-            minLength={isRegister ? 8 : undefined}
-            required
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
+          <div className="auth-input-field">
+            <LockKeyhole className="auth-field-icon" size={19} aria-hidden="true" />
+            <input
+              id="auth-password"
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Enter your password"
+              autoComplete={isRegister ? 'new-password' : 'current-password'}
+              minLength={isRegister ? 8 : undefined}
+              required
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+            <button className="auth-visibility-icon" type="button" aria-pressed={showPassword}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              onClick={() => setShowPassword((v) => !v)}>
+              {showPassword ? <EyeOff size={19} aria-hidden="true" /> : <Eye size={19} aria-hidden="true" />}
+            </button>
+          </div>
 
           {isRegister && (
             <>
               <label htmlFor="auth-confirm-password">Confirm password</label>
-              <input
-                id="auth-confirm-password"
-                name="confirmPassword"
-                type="password"
-                autoComplete="new-password"
-                minLength={8}
-                required
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
-              />
+              <div className="auth-input-field">
+                <LockKeyhole className="auth-field-icon" size={19} aria-hidden="true" />
+                <input
+                  id="auth-confirm-password"
+                  name="confirmPassword"
+                  type={showConfirm ? 'text' : 'password'}
+                  placeholder="Confirm your password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                />
+                <button className="auth-visibility-icon" type="button" aria-pressed={showConfirm}
+                  aria-label={showConfirm ? 'Hide confirmation password' : 'Show confirmation password'}
+                  onClick={() => setShowConfirm((v) => !v)}>
+                  {showConfirm ? <EyeOff size={19} aria-hidden="true" /> : <Eye size={19} aria-hidden="true" />}
+                </button>
+              </div>
+              <label htmlFor="auth-registration-code">Personnel registration code</label>
+              <div className="auth-input-field">
+                <KeyRound className="auth-field-icon" size={19} aria-hidden="true" />
+                <input id="auth-registration-code" name="registrationCode"
+                  type={showRegistrationCode ? 'text' : 'password'} autoComplete="off"
+                  placeholder="Enter your registration code" maxLength={256} required
+                  value={registrationCode} onChange={(event) => setRegistrationCode(event.target.value)} />
+                <button className="auth-visibility-icon" type="button" aria-pressed={showRegistrationCode}
+                  aria-label={showRegistrationCode ? 'Hide registration code' : 'Show registration code'}
+                  onClick={() => setShowRegistrationCode((v) => !v)}>
+                  {showRegistrationCode ? <EyeOff size={19} aria-hidden="true" /> : <Eye size={19} aria-hidden="true" />}
+                </button>
+              </div>
               <p className="auth-hint">
                 Use at least 8 characters with uppercase and lowercase letters, a number, and a symbol.
               </p>
             </>
           )}
 
+          {!isRegister && needsLegacyVerification && (
+            <>
+              <label htmlFor="auth-registration-code">Verify existing account</label>
+              <div className="auth-input-field">
+                <KeyRound className="auth-field-icon" size={19} aria-hidden="true" />
+                <input id="auth-registration-code" name="registrationCode"
+                  type={showRegistrationCode ? 'text' : 'password'} autoComplete="off"
+                  placeholder="Enter your registration code" maxLength={256} required
+                  value={registrationCode} onChange={(event) => setRegistrationCode(event.target.value)} />
+                <button className="auth-visibility-icon" type="button" aria-pressed={showRegistrationCode}
+                  aria-label={showRegistrationCode ? 'Hide registration code' : 'Show registration code'}
+                  onClick={() => setShowRegistrationCode((v) => !v)}>
+                  {showRegistrationCode ? <EyeOff size={19} aria-hidden="true" /> : <Eye size={19} aria-hidden="true" />}
+                </button>
+              </div>
+              <p className="auth-hint">Enter the developer registration code once to verify this existing account.</p>
+            </>
+          )}
           <button className="auth-submit" type="submit" disabled={submitting}>
             {submitting
               ? 'Please wait…'
@@ -112,7 +178,7 @@ export default function AuthPage() {
         </form>
 
         <p className="auth-switch">
-          {isRegister ? 'Already registered?' : 'New operator?'}{' '}
+          {isRegister ? 'Already have an account?' : 'Authorized personnel without an account?'}{' '}
           <Link to={isRegister ? '/login' : '/register'}>
             {isRegister ? 'Sign in' : 'Register'}
           </Link>

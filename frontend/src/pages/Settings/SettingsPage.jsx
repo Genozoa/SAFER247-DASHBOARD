@@ -43,6 +43,7 @@ function receiverBadgeState(worker, requestError) {
 export default function SettingsPage() {
   const { operator, updateCallSign, logout } = useAuth();
   const { dataSource } = useOperationalData();
+  const isDemo = operator.call_sign === 'Demo';
   const [callSign, setCallSign] = useState(operator.call_sign);
   const [profileMessage, setProfileMessage] = useState('');
   const [profileError, setProfileError] = useState('');
@@ -65,7 +66,7 @@ export default function SettingsPage() {
   ].filter(Boolean);
 
   useEffect(() => {
-    if (dataSource !== 'api') {
+    if (dataSource !== 'api' || isDemo) {
       setRadioStatus(null);
       setRadioStatusError('');
       return undefined;
@@ -96,7 +97,7 @@ export default function SettingsPage() {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [dataSource]);
+  }, [dataSource, isDemo]);
 
   function handleCallSignSubmit(event) {
     event.preventDefault();
@@ -159,7 +160,7 @@ export default function SettingsPage() {
                 className="settings-status-badge"
                 data-state={receiverBadgeState(workerStatus, radioStatusError)}
               >
-                {receiverStateLabel(dataSource, workerStatus, radioStatusError)}
+                {isDemo ? 'Disabled for Demo' : receiverStateLabel(dataSource, workerStatus, radioStatusError)}
               </span>
             </div>
           </div>
@@ -171,8 +172,8 @@ export default function SettingsPage() {
           <div className="settings-row">
             <span className="settings-row-label">Active input</span>
             <span className="settings-row-value">
-              {dataSource === 'demo'
-                ? 'Unavailable in demo mode'
+              {isDemo
+                ? 'Not available to Demo'
                 : workerStatus?.input_state === 'disabled'
                   ? 'Disabled'
                 : radioStatus?.worker?.input_device || 'Not selected'}
@@ -182,8 +183,8 @@ export default function SettingsPage() {
           <div className="settings-row">
             <span className="settings-row-label">Active output</span>
             <span className="settings-row-value">
-              {dataSource === 'demo'
-                ? 'Unavailable in demo mode'
+              {isDemo
+                ? 'Not available to Demo'
                 : workerStatus?.output_state === 'disabled'
                   ? 'Disabled'
                 : radioStatus?.worker?.output_device || 'Not selected'}

@@ -1,13 +1,13 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from geoalchemy2 import Geometry
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import cast, func, literal, select
+from sqlalchemy import cast, func, literal, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
-from app.auth.api import CurrentPrincipal
+from app.auth.api import CurrentPrincipal, CurrentSender
 from app.db.models import (
     Barangay,
     IncidentReport,
@@ -16,6 +16,7 @@ from app.db.models import (
     Message,
     Operator,
     Responder,
+    ResponderLocation,
 )
 from app.db.session import get_db_session
 from app.radio_lab.api import get_radio_settings
@@ -111,7 +112,7 @@ def _coordinate_text(latitude: float | None, longitude: float | None) -> str:
     return f"{latitude:.4f}, {longitude:.4f}"
 
 
-def _incident_rows(db: Session):
+def _incident_rows(db: Session, owner_id, limit: int = 500, offset: int = 0):
     latitude, longitude = _point_coordinates(db, IncidentReport.location)
     statement = (
         select(
@@ -126,7 +127,10 @@ def _incident_rows(db: Session):
         .outerjoin(Responder, IncidentReport.responder_id == Responder.id)
         .outerjoin(Barangay, IncidentReport.barangay_id == Barangay.id)
         .options(selectinload(IncidentReport.media_attachments))
+        .where(IncidentReport.sample_owner_operator_id == owner_id if owner_id is not None
+               else IncidentReport.sample_owner_operator_id.is_(None))
         .order_by(IncidentReport.reported_at.desc(), IncidentReport.id)
+        .limit(limit).offset(offset)
     )
     return db.execute(statement).all()
 
@@ -148,11 +152,11 @@ def _incident_view(row) -> IncidentView:
         text=report.details,
         status=report.status,
         has_image=bool(report.media_attachments),
-        data_source="database",
+        data_source="synthetic" if report.sample_owner_operator_id else "database",
     )
 
 
-def _message_rows(db: Session):
+def _message_rows(db: Session, owner_id, limit: int = 500, offset: int = 0):
     latitude, longitude = _point_coordinates(db, IncidentReport.location)
     statement = (
         select(Message, latitude, longitude)
@@ -169,14 +173,16 @@ def _message_rows(db: Session):
             ),
             joinedload(Message.incident_report).joinedload(IncidentReport.barangay),
         )
+        .where(Message.sample_owner_operator_id == owner_id if owner_id is not None
+               else Message.sample_owner_operator_id.is_(None))
         .order_by(
             func.coalesce(
                 Message.sent_at,
                 Message.received_at,
                 Message.created_at,
-            ),
+            ).desc(),
             Message.id,
-        )
+        ).limit(limit).offset(offset)
     )
     return db.execute(statement).all()
 
@@ -257,30 +263,34 @@ def _message_view(row) -> MessageView:
             {"filename": "PD90 image", "originalUrl": radio_view["original_url"], "enhancedUrl": radio_view["enhanced_url"]}
             if radio_view["original_url"] else None
         ),
-        data_source="database",
+        data_source="synthetic" if message.sample_owner_operator_id else "database",
     )
 
 
 @router.get("/incidents", response_model=list[IncidentView])
 def list_incidents(
-    _: CurrentPrincipal,
+    principal: CurrentPrincipal,
     db: DBSession,
+    limit: int = Query(default=500, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
 ) -> list[IncidentView]:
-    return [_incident_view(row) for row in _incident_rows(db)]
+    return [_incident_view(row) for row in _incident_rows(db, principal.operator.id if principal.operator.username == "Demo" else None, limit, offset)]
 
 
 @router.get("/messages", response_model=list[MessageView])
 def list_messages(
-    _: CurrentPrincipal,
+    principal: CurrentPrincipal,
     db: DBSession,
+    limit: int = Query(default=500, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
 ) -> list[MessageView]:
-    return [_message_view(row) for row in _message_rows(db)]
+    return [_message_view(row) for row in _message_rows(db, principal.operator.id if principal.operator.username == "Demo" else None, limit, offset)]
 
 
 @router.post("/messages", response_model=MessageView, status_code=201)
 def queue_message(
     payload: QueuedMessageRequest,
-    principal: CurrentPrincipal,
+    principal: CurrentSender,
     db: DBSession,
     settings: RadioSettingsDependency,
 ) -> MessageView:
@@ -311,3 +321,105 @@ def queue_message(
         radio_backed=True,
         data_source="database",
     )
+
+
+class ImageCorrelationRequest(BaseModel):
+    report_code: str = Field(min_length=8, max_length=64)
+    confirm: bool
+    verification_notes: str = Field(min_length=12, max_length=1000)
+
+
+@router.post("/images/{attachment_id}/correlate", status_code=200)
+def correlate_image(
+    attachment_id: str,
+    payload: ImageCorrelationRequest,
+    principal: CurrentSender,
+    db: DBSession,
+):
+    """Require explicit human verification; SSTV contains no inherent report identity."""
+    from uuid import UUID
+    try:
+        attachment_uuid = UUID(attachment_id)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail="Invalid attachment ID.") from error
+    if payload.confirm is not True:
+        raise HTTPException(status_code=422, detail="Explicit confirmation is required.")
+    attachment = db.scalar(
+        select(MediaAttachment).where(MediaAttachment.id == attachment_uuid).with_for_update()
+    )
+    report = db.scalar(
+        select(IncidentReport).where(IncidentReport.report_code == payload.report_code).with_for_update()
+    )
+    if attachment is None or report is None:
+        raise HTTPException(status_code=404, detail="Image or incident was not found.")
+    if attachment.incident_report_id is not None:
+        raise HTTPException(status_code=409, detail="This image is already linked to an incident.")
+    if attachment.message_id is None:
+        raise HTTPException(status_code=422, detail="Only received radio images are eligible.")
+    received = db.get(Message, attachment.message_id)
+    if received is None or received.direction != "incoming" or (
+        (received.decoded_payload or {}).get("radio_lab", {}).get("kind") != "image"
+    ):
+        raise HTTPException(status_code=422, detail="Attachment is not a decoded SSTV image.")
+    if report.status != "pending_image":
+        raise HTTPException(status_code=409, detail="Report is not awaiting an image.")
+    attachment.incident_report_id = report.id
+    attachment.linked_by_operator_id = principal.operator.id
+    attachment.linked_at = datetime.now(timezone.utc)
+    report.status = "complete"
+    report.updated_at = datetime.now(timezone.utc)
+    # Notes are a human assertion, never proof of RF origin.
+    radio = dict((received.decoded_payload or {}).get("radio_lab", {}))
+    radio["manual_correlation"] = {
+        "report_code": payload.report_code,
+        "operator_id": str(principal.operator.id),
+        "notes": payload.verification_notes,
+        "verified_at": attachment.linked_at.isoformat(),
+        "proof": "human_review_unverified_origin",
+    }
+    received.decoded_payload = {**(received.decoded_payload or {}), "radio_lab": radio}
+    db.commit()
+    return {"reportCode": report.report_code, "attachmentId": str(attachment.id),
+            "linkedBy": str(principal.operator.id), "verification": "manual_review"}
+
+
+class ResponderTrackView(BaseModel):
+    id: str
+    name: str
+    unit: str
+    lat: float
+    lng: float
+    lastSeen: datetime
+    trail: list[list[float]]
+    source: str = "unverified_aprs_radio"
+
+
+@router.get("/responders/locations", response_model=list[ResponderTrackView])
+def responder_locations(principal: CurrentPrincipal, db: DBSession) -> list[ResponderTrackView]:
+    """Return recent radio-derived positions only; APRS does not authenticate sender identity."""
+    if principal.operator.username == "Demo":
+        return []
+    latitude, longitude = _point_coordinates(db, ResponderLocation.location)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    rows = db.execute(
+        select(Responder, ResponderLocation, latitude, longitude)
+        .join(ResponderLocation, ResponderLocation.responder_id == Responder.id)
+        .where(Responder.is_active.is_(True), ResponderLocation.recorded_at >= cutoff)
+        .order_by(ResponderLocation.recorded_at.desc(), ResponderLocation.id.desc())
+        .limit(2000)
+    ).all()
+    tracks = {}
+    for responder, position, lat, lng in rows:
+        if lat is None or lng is None or not (-90 <= lat <= 90 and -180 <= lng <= 180):
+            continue
+        key = str(responder.id)
+        if key not in tracks:
+            tracks[key] = {"id": key, "name": responder.display_name or responder.call_sign,
+                           "unit": responder.call_sign, "lat": lat, "lng": lng,
+                           "lastSeen": position.recorded_at, "trail": [],
+                           "source": "unverified_aprs_radio"}
+        if len(tracks[key]["trail"]) < 25:
+            tracks[key]["trail"].append([lat, lng])
+    for track in tracks.values():
+        track["trail"].reverse()
+    return [ResponderTrackView(**track) for track in tracks.values()]

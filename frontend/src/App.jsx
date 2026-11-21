@@ -52,15 +52,6 @@ function AuthenticatedShell({ operator, logout }) {
       <Header operator={operator} />
       <Sidebar onLogout={logout} />
       <main className="main-content" id="main-content">
-        {dataSource === 'demo' && (
-          <aside className="demo-data-banner" role="status">
-            Demo data · {operator.call_sign}
-            <span>
-              Fictional sample records only. Outgoing demo messages stay local and are not transmitted;
-              live officer GPS is unavailable.
-            </span>
-          </aside>
-        )}
         {loading && <p role="status">Loading operational records…</p>}
         {error && <p className="auth-alert" role="alert">{error}</p>}
         <PageTransition>
