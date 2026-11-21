@@ -6,6 +6,8 @@ supervised worker encodes outgoing APRS and independently receives APRS/SSTV.
 from __future__ import annotations
 
 import json
+import socket
+from dataclasses import replace
 import hashlib
 import importlib.util
 import logging
@@ -23,6 +25,8 @@ import wave
 from uuid import uuid4
 
 from app.radio_lab.audio_devices import AudioDeviceManager
+from app.radio_lab.aprs.kiss import KissTcpClient, KissFramer, decode_kiss_chunk
+from app.radio_lab.aprs.codec import build_text, build_position
 from app.radio_lab.settings import RadioSettings
 from app.radio_lab.worker_status import write_status
 
@@ -41,12 +45,17 @@ def _module_available(name: str) -> bool:
 
 
 def _codec_status(settings: RadioSettings) -> tuple[dict[str, bool], list[str]]:
+    kiss = settings.aprs_transport == "kiss"
     capabilities = {
-        "aprs_encoder": bool(Path(settings.gen_packets).is_file() or shutil.which(settings.gen_packets))
-        and _module_available("aprslib"),
-        "aprs_decoder": bool(Path(settings.atest).is_file() or shutil.which(settings.atest))
-        and _module_available("aprslib"),
+        "aprs_encoder": (True if kiss else bool(
+            Path(settings.gen_packets).is_file() or shutil.which(settings.gen_packets))
+            and _module_available("aprslib")),
+        "aprs_decoder": (_module_available("aprslib") if kiss else bool(
+            Path(settings.atest).is_file() or shutil.which(settings.atest))
+            and _module_available("aprslib")),
         "sstv_decoder": _module_available("open_sstv.core.decoder"),
+        "wav_aprs_decoder": bool(Path(settings.atest).is_file() or shutil.which(settings.atest)),
+        "wav_aprs_encoder": bool(Path(settings.gen_packets).is_file() or shutil.which(settings.gen_packets)),
     }
     errors = []
     if not capabilities["aprs_encoder"]:
@@ -55,6 +64,12 @@ def _codec_status(settings: RadioSettings) -> tuple[dict[str, bool], list[str]]:
         errors.append("APRS decoder unavailable: Dire Wolf atest and aprslib are required.")
     if not capabilities["sstv_decoder"]:
         errors.append("SSTV decoder unavailable: Open-SSTV is not installed.")
+    if kiss and not capabilities["wav_aprs_decoder"]:
+        errors.append("Recorded WAV APRS fallback requires atest; live KISS APRS remains available.")
+    if kiss and not capabilities["wav_aprs_encoder"]:
+        errors.append("WAV APRS fallback encoding requires gen_packets.")
+    if kiss and not _module_available("aprslib"):
+        errors.append("TCP KISS APRS reception requires aprslib.")
     return capabilities, errors
 
 
@@ -276,6 +291,8 @@ class RadioWorker:
         self.capture_process = None
         self._capture_lock = threading.Lock()
         self.audio_devices: AudioDeviceManager | None = None
+        self.kiss_client = KissTcpClient(settings.kiss_host, settings.kiss_port) if settings.aprs_transport == "kiss" else None
+        self.direwolf_process: subprocess.Popen | None = None
         self._status_lock = threading.Lock()
         self._status = {
             "state": "starting",
@@ -285,6 +302,8 @@ class RadioWorker:
             "output_device": None,
             "input_state": "starting",
             "output_state": "starting",
+            "aprs_transport": settings.aprs_transport,
+            "kiss_state": "disabled" if settings.aprs_transport != "kiss" else "starting",
             "error": None,
         }
 
@@ -301,6 +320,83 @@ class RadioWorker:
                 return
             except queue.Full:
                 continue
+
+    def _start_direwolf(self) -> None:
+        """Launch one owned TNC. Never stop a pre-existing external Dire Wolf."""
+        if not self.settings.kiss_manage_direwolf:
+            return
+        existing = self.direwolf_process
+        if existing is not None and existing.poll() is None:
+            return
+        executable = self.settings.direwolf_executable
+        config = self.settings.direwolf_config
+        if config is None or not config.is_file():
+            raise FileNotFoundError("Managed KISS requires an existing RADIO_DIREWOLF_CONFIG")
+        # Dedicated TNC owns APRS audio, so Python does not open its audio devices.
+        self.direwolf_process = subprocess.Popen(
+            [executable, "-c", str(config)],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            **({"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0)}
+               if os.name == "nt" else {}),
+        )
+
+    def _stop_direwolf(self) -> None:
+        process, self.direwolf_process = self.direwolf_process, None
+        if process is None or process.poll() is not None:
+            return
+        process.terminate()
+        try:
+            process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=3)
+
+    def _listen_kiss(self) -> None:
+        """Persistent receive loop, bounded reconnect, and process lifecycle."""
+        client = self.kiss_client
+        if client is None:
+            return
+        while not self.stop.is_set():
+            try:
+                self._start_direwolf()
+                client.connect()
+                parser = KissFramer()
+                self._publish_status(
+                    kiss_state="connected",
+                    kiss_error=None,
+                    input_state="listening",
+                    output_state="ready" if self.settings.output_enabled else "disabled",
+                )
+                while not self.stop.is_set():
+                    try:
+                        chunk = client.recv()
+                    except socket.timeout:
+                        continue
+                    if not chunk:
+                        raise ConnectionError("Dire Wolf closed the TCP KISS connection.")
+                    for record in decode_kiss_chunk(parser, chunk):
+                        record["receipt_id"] = f"kiss:{uuid4()}"
+                        while not self.stop.is_set():
+                            try:
+                                self.rx_results.put(
+                                    {"source": None, "records": [record], "warnings": []},
+                                    timeout=.2,
+                                )
+                                break
+                            except queue.Full:
+                                continue
+            except (OSError, ConnectionError, ValueError) as error:
+                self._publish_status(
+                    kiss_state="disconnected", kiss_error=str(error),
+                    input_state="error",
+                    output_state="error" if self.settings.output_enabled else "disabled",
+                )
+                log.warning("TCP KISS disconnected: %s", error)
+            finally:
+                client.close()
+            self.stop.wait(2)
 
     def _listen_spool(self) -> None:
         incoming = self.settings.spool_dir
@@ -403,9 +499,36 @@ class RadioWorker:
         while not self.stop.is_set():
             job = None
             try:
+                if self.kiss_client is not None:
+                    # Never claim a job while the TNC is unavailable or RF output
+                    # is disabled. Queue records stay durable and untouched.
+                    if not self.settings.output_enabled or not self.kiss_client.connected:
+                        self.stop.wait(.25)
+                        continue
                 job = self.repository.claim_next()
                 if job is None:
                     self.stop.wait(.25)
+                    continue
+                if self.kiss_client is not None:
+                    if job.get("compound_id"):
+                        raise ValueError("Legacy compound APRS transmissions are unsupported.")
+                    if job["kind"] == "text":
+                        packet = build_text(job["station"], job["text"], job.get("addressee", "ALL"))
+                    elif job["kind"] == "position":
+                        packet = build_position(
+                            job["station"], job["latitude"], job["longitude"],
+                            job.get("text", ""),
+                        )
+                    else:
+                        raise ValueError("Only APRS text and position jobs can use TCP KISS.")
+                    # Mark the attempt before any bytes leave the process; a partial
+                    # send or TCP failure must never cause an automatic repeat.
+                    self.repository.mark_sending(job["id"])
+                    self.kiss_client.send(packet)
+                    self.repository.finish(job["id"], {
+                        "kiss_accepted": True, "delivery": "kiss-tnc",
+                    })
+                    self._publish_status(output_state="ready", output_error=None)
                     continue
                 self.tx_requests.put(job, timeout=1)
                 deadline = time.monotonic() + 120
@@ -478,7 +601,17 @@ class RadioWorker:
     def run(self, health_check=None) -> None:
         for directory in (self.settings.storage_dir, self.settings.spool_dir, self.settings.output_dir):
             directory.mkdir(parents=True, exist_ok=True)
-        self.audio_devices = AudioDeviceManager(self.settings)
+        if self.kiss_client is not None:
+            # Dire Wolf owns APRS audio. Live PD90 capture is optional and must
+            # have a separately configured input source, never host-default.
+            audio_settings = replace(
+                self.settings,
+                input_enabled=self.settings.kiss_sstv_input_enabled and self.settings.input_enabled,
+                output_enabled=False,
+            )
+            self.audio_devices = AudioDeviceManager(audio_settings)
+        else:
+            self.audio_devices = AudioDeviceManager(self.settings)
         capabilities, codec_errors = _codec_status(self.settings)
         self._publish_status(
             **self.audio_devices.status(),
@@ -498,7 +631,13 @@ class RadioWorker:
             threading.Thread(target=self._listen_spool, name="audio-spool-listener", daemon=True),
             threading.Thread(target=self._send, name="audio-sender", daemon=True),
         ]
-        if self.settings.input_enabled:
+        if self.kiss_client is not None:
+            threads.append(
+                threading.Thread(target=self._listen_kiss, name="kiss-tnc-listener", daemon=True)
+            )
+        if self.settings.input_enabled and (
+            self.kiss_client is None or self.settings.kiss_sstv_input_enabled
+        ):
             threads.append(
                 threading.Thread(target=self._listen_audio, name="audio-listener", daemon=True)
             )
@@ -538,6 +677,8 @@ class RadioWorker:
                     log.exception("Receive persistence failed; result saved in recovery directory")
         finally:
             self.stop.set()
+            if self.kiss_client is not None:
+                self.kiss_client.close()
             try:
                 self._publish_status(state="stopping")
             finally:
@@ -555,6 +696,7 @@ class RadioWorker:
                         process.terminate()
                         process.join(timeout=2)
                 self._stop_capture_process()
+                self._stop_direwolf()
                 self._publish_status(
                     state="stopped",
                     input_state="stopped",

@@ -61,21 +61,27 @@ def status(_: CurrentRadioViewer, settings: Settings, request: Request):
         "input_state": "unknown",
         "output_state": "unknown",
     }
+    kiss = settings.aprs_transport == "kiss"
+    kiss_connected = worker.get("kiss_state") == "connected"
     return {"enabled": settings.enabled, "station": settings.station,
-            "backend": "audio-device+wav-spool",
+            "backend": "direwolf-tcp-kiss+wav-spool" if kiss else "audio-device+wav-spool",
+            "aprs_transport": settings.aprs_transport,
             "worker": worker,
             "hardware_verified": False, "android_verified": False,
             "audio_output_configured": bool(
-                settings.output_enabled
-                and (settings.output_command or worker.get("output_device"))
+                settings.output_enabled and (
+                    kiss_connected if kiss
+                    else settings.output_command or worker.get("output_device")
+                )
             ),
             "continuous_input_configured": bool(
-                settings.input_enabled
+                kiss_connected if kiss else settings.input_enabled
                 and (settings.input_command or worker.get("input_device"))
             ),
-            "delivery": "audio-output"
-            if settings.output_enabled and (settings.output_command or worker.get("output_device"))
-            else "wav-file"}
+            "delivery": ("kiss-tnc" if settings.output_enabled else "disabled") if kiss
+            else "audio-output" if settings.output_enabled and (
+                settings.output_command or worker.get("output_device")
+            ) else "wav-file"}
 
 
 @router.get("/messages")

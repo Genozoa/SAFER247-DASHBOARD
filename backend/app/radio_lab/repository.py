@@ -162,8 +162,9 @@ class RadioRepository:
             if message is None or message.transmission_status not in {"preparing", "sending"}:
                 raise ValueError("Radio job is no longer transmitting.")
             audio_complete = result.get("audio_complete") is True
-            status = "audio_complete" if audio_complete else "queued"
-            stage = status if status != "queued" else "encoded"
+            kiss_accepted = result.get("kiss_accepted") is True
+            status = "delivery_unknown" if kiss_accepted else "audio_complete" if audio_complete else "queued"
+            stage = "tnc_queued" if kiss_accepted else status if status != "queued" else "encoded"
             data = radio_data(message)
             data.update(stage=stage, delivery=result.get("delivery", "wav-file"),
                         audio_path=str(result.get("audio_path", "")), error=None)
@@ -171,7 +172,9 @@ class RadioRepository:
             message.transmission_status = status
             if audio_complete:
                 message.sent_at = now()
-            if audio_complete:
+            if kiss_accepted:
+                detail = "Frame submitted to Dire Wolf via TCP KISS; RF delivery is unconfirmed. No automatic retry."
+            elif audio_complete:
                 detail = "Audio output completed; receiver delivery is unconfirmed."
             else:
                 detail = "WAV file created; no audio output or radio transmission occurred."
@@ -507,7 +510,9 @@ class RadioRepository:
             )
         ]
         latest_detail = attempts[-1]["result_details"] if attempts else None
-        if data.get("error") and status == "delivery_unknown":
+        if stage == "tnc_queued" and status == "delivery_unknown":
+            status_detail = latest_detail or "Frame submitted to Dire Wolf; RF delivery is unconfirmed."
+        elif data.get("error") and status == "delivery_unknown":
             status_detail = f"Delivery is unknown; no automatic retry was made. {data['error']}"
         elif data.get("error"):
             status_detail = data["error"]
@@ -515,12 +520,14 @@ class RadioRepository:
             status_detail = "WAV file created; no audio output is configured, so it was not transmitted."
         elif status == "queued" and settings is not None and not settings.enabled:
             status_detail = "Radio processing is disabled; queued by the backend and not transmitted."
+        elif status == "queued" and settings is not None and settings.aprs_transport == "kiss":
+            status_detail = "Queued for TCP KISS; no RF transmission has been confirmed."
         elif status == "queued" and settings is not None and not settings.output_command:
             status_detail = "Queued by the backend; no audio output is configured, so it has not been transmitted."
         elif status == "queued":
             status_detail = "Queued by the backend, waiting for the radio worker; not transmitted."
         elif status == "preparing":
-            status_detail = "The radio worker is preparing audio; output has not started."
+            status_detail = "The radio worker is preparing APRS data; output has not started."
         elif status == "sending":
             status_detail = "Configured audio output has started; receiver delivery is unconfirmed."
         elif status == "audio_complete":
