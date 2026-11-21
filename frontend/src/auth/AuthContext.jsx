@@ -32,10 +32,10 @@ export function AuthProvider({ children }) {
     refresh();
   }, [refresh]);
 
-  const login = useCallback(async (callSign, password) => {
+  const login = useCallback(async (callSign, password, registrationCode) => {
     const authenticatedOperator = await request('/auth/login', {
       method: 'POST',
-      body: { call_sign: callSign, password },
+      body: { call_sign: callSign, password, ...(registrationCode !== undefined ? { registration_code: registrationCode } : {}) },
     });
     setOperator(authenticatedOperator);
     setServiceError('');

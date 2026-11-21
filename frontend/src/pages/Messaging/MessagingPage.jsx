@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Send, RotateCw, AlertCircle, Search } from 'lucide-react';
+import { Image, MapPin, Send, RotateCw, AlertCircle, Search } from 'lucide-react';
 import { INCIDENT_TYPES } from '../../data/referenceData';
 import { useOperationalData } from '../../data/OperationalDataContext';
 import { useAuth } from '../../auth/AuthContext';
@@ -43,7 +43,7 @@ function MessageTimestamp({ sentAt, currentTime }) {
 
 export default function MessagingPage() {
   const { operator } = useAuth();
-  const canTransmit = operator?.role === 'operator' || operator?.role === 'admin';
+  const canTransmit = operator?.call_sign?.toLowerCase() !== 'demo';
   const [searchParams, setSearchParams] = useSearchParams();
   const {
     messages: transmissions,
@@ -393,7 +393,7 @@ export default function MessagingPage() {
         <textarea
           ref={messageInputRef}
           rows={1}
-          placeholder={canTransmit ? "Broadcast to all units..." : "Read-only account. Request operator permission to broadcast."}
+          placeholder={canTransmit ? "Broadcast to all units..." : "Demo account cannot transmit."}
           value={messageText}
           disabled={!canTransmit}
           maxLength={MAX_MESSAGE_LENGTH}
@@ -422,7 +422,7 @@ export default function MessagingPage() {
             <Send size={15} />
           </button>
         </span>
-        <small>{canTransmit ? 'Text-only APRS broadcast. Shift+Enter inserts a new line. All sent messages reach the outgoing radio queue; RF delivery is unconfirmed.' : 'Viewer access: transmitting and retrying broadcasts is disabled.'}</small>
+        <small>{canTransmit ? 'Text-only APRS broadcast. Shift+Enter inserts a new line. All sent messages reach the outgoing radio queue; RF delivery is unconfirmed.' : 'Demo account: outgoing broadcasts are disabled.'}</small>
       </div>
     </div>
   );
