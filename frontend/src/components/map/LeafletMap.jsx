@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import L from 'leaflet';
 import {
-  Layers,
   Map as MapIcon,
+  Satellite,
+  Mountain,
   LocateFixed,
   Maximize2,
   Eye,
@@ -23,28 +24,18 @@ import sanFernandoBarangaysGeoJson from './san-fernando-barangays.geojson';
 import { createKdeHeatmapLayer } from './KdeHeatmapLayer';
 import { getIncidentHeatmapPoints } from '../../utils/incidentData';
 
-// Standard interactive OSM tiles follow https://operations.osmfoundation.org/policies/tiles/
-// Never prefetch or cache them for offline use; the offline layer uses separately licensed local tiles.
-const TILE_LAYERS = {
-  default: {
-    name: 'Online',
-    icon: MapIcon,
-    description: 'OpenStreetMap streets and geographical features',
-    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    options: {
-      maxZoom: 19,
-      maxNativeZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>',
-    },
-  },
-  offline: {
-    name: 'Offline',
-    icon: Layers,
-    description: 'Tiles stored locally by the LDRRMO for offline operations',
-    url: '/api/maps/tiles/{z}/{x}/{y}.png',
-    options: { maxZoom: 18, attribution: 'Locally provisioned offline tiles' },
-  },
+// The key and Google session tokens stay exclusively on the FastAPI server.
+// Google tiles are never part of the separate, licensed local offline tile pack.
+const GOOGLE_STYLES = {
+  roadmap: { name: 'Roadmap', icon: MapIcon },
+  satellite: { name: 'Satellite', icon: Satellite },
+  terrain: { name: 'Terrain', icon: Mountain },
 };
+const GOOGLE_TILE_URL = (style) => `/api/maps/google/${style}/tiles/{z}/{x}/{y}`;
+const OFFLINE_TILE_URL = '/api/maps/tiles/{z}/{x}/{y}.png';
+const TILE_OPTIONS = { maxZoom: 18, maxNativeZoom: 18 };
+const ONLINE_PROBE_MS = 45000;
+const PROVIDER_RETRY_MS = 5 * 60 * 1000;
 
 const escapeMapLabel = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -76,8 +67,8 @@ export default function LeafletMap({
   const municipalPolygonRef = useRef(null);
   const skipNextFlyToRef = useRef(false);
 
-  // Active base layer is online by default, independent of browser connectivity heuristics.
-  const [mapType, setMapType] = useState('default');
+  // Style choice is independent of the currently active tile source.
+  const [mapType, setMapType] = useState('roadmap');
   const [showMunicipalBorder, setShowMunicipalBorder] = useState(true);
   const [showBarangayPolygons, setShowBarangayPolygons] = useState(true);
   const [kdeRadius, setKdeRadius] = useState(36);
@@ -86,93 +77,241 @@ export default function LeafletMap({
   const [allowedMinZoom, setAllowedMinZoom] = useState(10);
   const [basemapStatus, setBasemapStatus] = useState(null);
   const [noticeDismissed, setNoticeDismissed] = useState(false);
-  const mapTypeRef = useRef('default');
-  const fallbackAttemptedRef = useRef(false);
-  const onlineWorkedRef = useRef(false);
-  const tileSwitchSequenceRef = useRef(0);
+  const [tileSource, setTileSource] = useState('google');
+  const [googleAttribution, setGoogleAttribution] = useState('');
+  const mapStyleRef = useRef('roadmap');
+  const sourceRef = useRef('google');
+  const revisionRef = useRef(0);
+  const retryAfterRef = useRef(0);
   const fallbackHandlerRef = useRef(null);
+  const unmountedRef = useRef(false);
   const isBasemapUnavailable = basemapStatus?.kind === 'unavailable';
 
-  // Connectivity events only retry the selected online layer. Tile success/failure
-  // determines availability; navigator.onLine alone does not.
-  useEffect(() => {
-    const retryOnline = () => {
-      if (mapTypeRef.current !== 'default') return;
-      fallbackAttemptedRef.current = false;
-      baseTileLayerRef.current?.redraw();
-    };
-    window.addEventListener('online', retryOnline);
-    return () => window.removeEventListener('online', retryOnline);
+  const currentTile = useCallback((map) => {
+    const z = Math.round(map.getZoom());
+    const point = map.project(map.getCenter(), z);
+    return `${z}/${Math.floor(point.x / 256)}/${Math.floor(point.y / 256)}`;
   }, []);
 
-  // Count actual image successes and errors. Avoid an errorTileUrl, whose blank
-  // replacement image could otherwise be mistaken for a successful tile load.
-  const createBaseTileLayer = useCallback((type, map) => {
-    if (!map) return null;
-    const config = TILE_LAYERS[type] || TILE_LAYERS.default;
-    const layer = L.tileLayer(config.url, config.options);
-    let failed = 0;
-    let loaded = 0;
+  const tileProbe = useCallback(async (url, signal) => {
+    // Distinguish a successful image response from missing tiles, HTTP denial,
+    // expired provider quota, and real network failures.
+    try {
+      const response = await fetch(url, { cache: 'no-store', credentials: 'same-origin', signal });
+      if (response.ok && (response.headers.get('content-type') || '').startsWith('image/')) {
+        return { ok: true };
+      }
+      const reason = await response.json().then((data) => data?.detail?.reason).catch(() => null);
+      return { ok: false, reason: reason || (response.status === 404 ? 'missing' : 'provider') };
+    } catch (error) {
+      return { ok: false, reason: error?.name === 'AbortError' ? 'aborted' : 'network' };
+    }
+  }, []);
 
-    layer.on('tileerror', () => { failed += 1; });
+  // Only a successful image response counts as a usable offline tile.
+  const offlineAvailable = useCallback(async (map, signal) => (
+    (await tileProbe(`/api/maps/tiles/${currentTile(map)}.png`, signal)).ok
+  ), [tileProbe, currentTile]);
+
+  const createBaseTileLayer = useCallback((source, style, map, revision) => {
+    const url = source === 'google' ? GOOGLE_TILE_URL(style) : OFFLINE_TILE_URL;
+    const layer = L.tileLayer(url, {
+      ...TILE_OPTIONS,
+      attribution: source === 'google' ? 'Google Maps' : 'Locally licensed offline tiles',
+    });
+    let loaded = 0;
+    let errors = 0;
     layer.on('tileload', () => {
       loaded += 1;
-      if (type === mapTypeRef.current) {
-        if (type === 'default') onlineWorkedRef.current = true;
-        setBasemapStatus(null);
-        setNoticeDismissed(false);
-      }
+      if (revision !== revisionRef.current || source !== sourceRef.current) return;
+      setBasemapStatus(null);
+      setNoticeDismissed(false);
     });
+    layer.on('tileerror', () => { errors += 1; });
     layer.on('load', () => {
-      if (type !== mapTypeRef.current) return;
-      if (failed > 0 && loaded === 0) {
-        if (type === 'default' && !fallbackAttemptedRef.current) {
-          fallbackAttemptedRef.current = true;
-          fallbackHandlerRef.current?.('default');
-        } else if (type === 'offline' && onlineWorkedRef.current && !fallbackAttemptedRef.current) {
-          fallbackAttemptedRef.current = true;
-          fallbackHandlerRef.current?.('offline');
-        } else {
-          setBasemapStatus({
-            kind: 'unavailable',
-            message: type === 'offline'
-              ? 'Local offline tiles are missing or unavailable for this view. Boundaries and incident overlays remain available.'
-              : 'Online tiles could not be loaded, and no usable fallback is available. Boundaries and incident overlays remain available.',
-          });
-          setNoticeDismissed(false);
-        }
-      } else if (failed > 0) {
+      if (revision !== revisionRef.current || source !== sourceRef.current) return;
+      // A failed entire tile batch is stronger evidence than navigator.onLine.
+      if (errors > 0 && loaded === 0) {
+        fallbackHandlerRef.current?.(source, revision);
+      } else if (errors > 0) {
         setBasemapStatus({
-          kind: 'partial',
-          message: type === 'offline'
-            ? 'Some local map tiles are missing at this zoom.'
-            : 'Some online map tiles failed to load.',
+          kind: 'partial', message: source === 'google'
+            ? 'Some Google map tiles are unavailable for this view.'
+            : 'Some local offline tiles are missing at this zoom.',
         });
         setNoticeDismissed(false);
       }
-      failed = 0;
       loaded = 0;
+      errors = 0;
     });
     layer.addTo(map);
     return layer;
   }, []);
 
-  // A single local tile at the current center/zoom verifies that the local
-  // pack actually covers this view before replacing a working online layer.
-  const localTileAvailable = useCallback(async (map) => {
-    const zoom = Math.round(map.getZoom());
-    const projected = map.project(map.getCenter(), zoom);
-    const x = Math.floor(projected.x / 256);
-    const y = Math.floor(projected.y / 256);
-    try {
-      const response = await fetch(`/api/maps/tiles/${zoom}/${x}/${y}.png`, {
-        credentials: 'same-origin',
-      });
-      return response.ok && (response.headers.get('content-type') || '').includes('image/');
-    } catch {
-      return false;
+  const replaceBaseLayer = useCallback((source, style) => {
+    const map = mapInstanceRef.current;
+    if (!map || unmountedRef.current) return;
+    const revision = ++revisionRef.current;
+    if (baseTileLayerRef.current) map.removeLayer(baseTileLayerRef.current);
+    sourceRef.current = source;
+    setTileSource(source);
+    setBasemapStatus(null);
+    setNoticeDismissed(false);
+    if (source === 'offline') setGoogleAttribution('');
+    baseTileLayerRef.current = createBaseTileLayer(source, style, map, revision);
+  }, [createBaseTileLayer]);
+
+  // A manual style change never selects the offline source. If the active map
+  // is offline, remember the style until real Google imagery becomes available.
+  const switchMapType = useCallback((style) => {
+    if (!GOOGLE_STYLES[style]) return;
+    mapStyleRef.current = style;
+    setMapType(style);
+    retryAfterRef.current = 0;
+    if (sourceRef.current === 'google') {
+      replaceBaseLayer('google', style);
     }
+  }, [replaceBaseLayer]);
+
+  const describeFailure = useCallback((reason, offline) => {
+    const labels = {
+      authorization: 'Google Maps API authorization failed. Check the API key and restrictions.',
+      quota: 'Google Maps API quota or request limit reached.',
+      configuration: 'Google Map Tiles API is not configured on the server.',
+      timeout: 'The Google tile service timed out.',
+      network: 'Google tiles could not be reached.',
+      provider_request: 'Google rejected the tile request.',
+      provider: 'Google Maps imagery is temporarily unavailable.',
+    };
+    const cause = labels[reason] || labels.provider;
+    return offline
+      ? `${cause} Using available local offline tiles.`
+      : `${cause} No local tile pack covers this view; boundaries and operational overlays remain visible.`;
   }, []);
+
+  const enterFallback = useCallback(async (revision) => {
+    const map = mapInstanceRef.current;
+    if (!map || revision !== revisionRef.current || unmountedRef.current) return;
+    const available = await offlineAvailable(map);
+    if (revision !== revisionRef.current || unmountedRef.current) return;
+    if (available) {
+      replaceBaseLayer('offline', mapStyleRef.current);
+      setBasemapStatus({
+        kind: 'partial',
+        message: 'Google map tiles are unavailable. Using locally stored offline map tiles.',
+      });
+    } else {
+      setBasemapStatus({
+        kind: 'unavailable',
+        message: 'Online basemap unavailable and no local tiles cover this view. Municipal and barangay boundaries remain visible.',
+      });
+    }
+    setNoticeDismissed(false);
+  }, [offlineAvailable, replaceBaseLayer]);
+
+  fallbackHandlerRef.current = (source, revision) => {
+    if (source === 'google') {
+      const map = mapInstanceRef.current;
+      if (!map) return;
+      // Probe once for a precise error reason. No retries inside tile callbacks.
+      void (async () => {
+        const state = await tileProbe(
+          `/api/maps/google/${mapStyleRef.current}/tiles/${currentTile(map)}`
+        );
+        if (revision !== revisionRef.current || unmountedRef.current) return;
+        if (['authorization', 'quota', 'configuration'].includes(state.reason)) {
+          retryAfterRef.current = Date.now() + PROVIDER_RETRY_MS;
+        }
+        const available = await offlineAvailable(map);
+        if (revision !== revisionRef.current || unmountedRef.current) return;
+        if (available) {
+          replaceBaseLayer('offline', mapStyleRef.current);
+          setBasemapStatus({ kind: 'partial', message: describeFailure(state.reason, true) });
+        } else {
+          setBasemapStatus({ kind: 'unavailable', message: describeFailure(state.reason, false) });
+        }
+        setNoticeDismissed(false);
+      })();
+    } else {
+      setBasemapStatus({
+        kind: 'unavailable',
+        message: 'Local offline tiles are missing for this view. Operational overlays remain visible.',
+      });
+      setNoticeDismissed(false);
+    }
+  };
+
+  // Offline recovery uses actual authenticated Google tile responses, not
+  // navigator.onLine alone. Failed checks occur at most once per interval.
+  useEffect(() => {
+    if (!isMapReady) return undefined;
+    let stopped = false;
+    let checking = false;
+    const controller = new AbortController();
+    const probe = async () => {
+      const map = mapInstanceRef.current;
+      if (checking || !map || sourceRef.current !== 'offline' ||
+          Date.now() < retryAfterRef.current) return;
+      checking = true;
+      const style = mapStyleRef.current;
+      const result = await tileProbe(
+        `/api/maps/google/${style}/tiles/${currentTile(map)}`,
+        controller.signal
+      );
+      checking = false;
+      if (stopped || unmountedRef.current || sourceRef.current !== 'offline' ||
+          style !== mapStyleRef.current) return;
+      if (result.ok) replaceBaseLayer('google', style);
+      else if (['authorization', 'quota', 'configuration'].includes(result.reason)) {
+        retryAfterRef.current = Date.now() + PROVIDER_RETRY_MS;
+      }
+    };
+    const interval = window.setInterval(() => { void probe(); }, ONLINE_PROBE_MS);
+    const onOnline = () => { void probe(); };
+    window.addEventListener('online', onOnline);
+    return () => {
+      stopped = true;
+      controller.abort();
+      window.clearInterval(interval);
+      window.removeEventListener('online', onOnline);
+    };
+  }, [isMapReady, tileProbe, currentTile, replaceBaseLayer]);
+
+  // Google requires viewport-dependent copyright text in addition to brand
+  // attribution; update it when the map moves or changes styles.
+  useEffect(() => {
+    if (!isMapReady || tileSource !== 'google') return undefined;
+    const map = mapInstanceRef.current;
+    if (!map) return undefined;
+    let controller = null;
+    const updateCopyright = () => {
+      if (controller) controller.abort();
+      controller = new AbortController();
+      const bounds = map.getBounds();
+      const search = new URLSearchParams({
+        zoom: String(Math.round(map.getZoom())),
+        north: String(bounds.getNorth()), south: String(bounds.getSouth()),
+        east: String(bounds.getEast()), west: String(bounds.getWest()),
+      });
+      fetch(`/api/maps/google/${mapType}/copyright?${search.toString()}`, {
+        cache: 'no-store', credentials: 'same-origin', signal: controller.signal,
+      }).then((response) => {
+        if (!response.ok) throw new Error('Attribution unavailable');
+        return response.json();
+      }).then((data) => {
+        if (data.copyright) setGoogleAttribution(data.copyright);
+      }).catch((error) => {
+        if (error.name !== 'AbortError') setGoogleAttribution('Map data © Google and providers');
+      });
+    };
+    setGoogleAttribution('Map data © Google and providers');
+    updateCopyright();
+    map.on('moveend', updateCopyright);
+    return () => {
+      controller?.abort();
+      map.off('moveend', updateCopyright);
+    };
+  }, [isMapReady, mapType, tileSource]);
 
   // Exact Bounding Box of SAN_FERNANDO_MUNICIPAL_BORDER
   const municipalBorderBounds = useMemo(() => {
@@ -221,8 +360,10 @@ export default function LeafletMap({
       zoomControl: false, // Custom zoom buttons
     });
 
-    // Add Base Tile Layer with offline detection
-    const baseLayer = createBaseTileLayer('default', map);
+    // Start with the selected Google style; offline mode is automatic only.
+    unmountedRef.current = false;
+    sourceRef.current = 'google';
+    const baseLayer = createBaseTileLayer('google', mapStyleRef.current, map, ++revisionRef.current);
     baseTileLayerRef.current = baseLayer;
 
     // Initialize Layer Groups in proper z-order
@@ -265,6 +406,8 @@ export default function LeafletMap({
     }, 120);
 
     return () => {
+      unmountedRef.current = true;
+      revisionRef.current += 1;
       clearTimeout(initialTimer);
       resizeObserver.disconnect();
       map.off('zoomend', handleZoomEnd);
@@ -274,42 +417,7 @@ export default function LeafletMap({
     };
   }, [updateDynamicMinZoom, createBaseTileLayer]);
 
-  // Switching never repeats automatically between two failed layers.
-  // If an offline pack is absent, keep the current map rather than showing blank tiles.
-  const switchMapType = useCallback(async (newType, { automatic = false } = {}) => {
-    const map = mapInstanceRef.current;
-    if (!map || !TILE_LAYERS[newType]) return;
-    const sequence = ++tileSwitchSequenceRef.current;
-    if (!automatic) fallbackAttemptedRef.current = false;
-
-    if (newType === 'offline' && !(await localTileAvailable(map))) {
-      if (sequence !== tileSwitchSequenceRef.current) return;
-      setBasemapStatus({
-        kind: automatic ? 'unavailable' : 'partial',
-        message: automatic
-          ? 'Online tiles failed to load. No local offline tiles cover this map view. Boundaries and incident overlays remain available.'
-          : 'Offline tile pack missing or not covering this map view. The current basemap remains selected.',
-      });
-      setNoticeDismissed(false);
-      return;
-    }
-    if (sequence !== tileSwitchSequenceRef.current) return;
-
-    if (baseTileLayerRef.current) map.removeLayer(baseTileLayerRef.current);
-    mapTypeRef.current = newType;
-    setMapType(newType);
-    setBasemapStatus(null);
-    setNoticeDismissed(false);
-    baseTileLayerRef.current = createBaseTileLayer(newType, map);
-  }, [createBaseTileLayer, localTileAvailable]);
-
-  fallbackHandlerRef.current = (failedType) => {
-    if (failedType === 'default') {
-      void switchMapType('offline', { automatic: true });
-    } else if (failedType === 'offline') {
-      void switchMapType('default', { automatic: true });
-    }
-  };
+  // Base layer switching and connectivity recovery are handled above.
 
   // Fit Entire San Fernando Lungsod (enclosing all 24 barangays)
   // Closest view with 12–20px space between the municipal border bounding box and map edges
@@ -767,9 +875,9 @@ export default function LeafletMap({
         </div>
       )}
 
-      {/* Online / offline tile switcher and existing map feature toggles */}
+      {/* Google style choices and existing operational overlays */}
       <div className="google-style-map-type-bar" role="group" aria-label="Map Type & Overlays">
-        {Object.entries(TILE_LAYERS).map(([key, config]) => {
+        {Object.entries(GOOGLE_STYLES).map(([key, config]) => {
           const IconComponent = config.icon;
           const isActive = mapType === key;
           return (
@@ -809,6 +917,13 @@ export default function LeafletMap({
           </button>
         </div>
       </div>
+
+      {tileSource === 'google' && (
+        <div className="google-map-attribution" role="note">
+          <strong>Google Maps</strong>
+          <span>{googleAttribution || 'Map data © Google and providers'}</span>
+        </div>
+      )}
 
       {/* Kernel Density Estimation (KDE) Heatmap Floating Controls */}
       {mode === 'Heatmap' && (
