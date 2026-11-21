@@ -7,7 +7,7 @@ All password hashes and sessions are preserved.
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0009_simplify_operator_registration"
+revision = "0009_registration_cleanup"
 down_revision = "0008_sample_data_ownership"
 branch_labels = None
 depends_on = None

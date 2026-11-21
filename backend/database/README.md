@@ -13,7 +13,7 @@ python -m alembic -c alembic.ini upgrade head
 python -m alembic -c alembic.ini current
 ```
 
-Expected head: `0009_simplify_operator_registration`.
+Expected head: `0009_registration_cleanup`.
 
 Revisions 0001–0008 establish the current operational system, incident image auditing, Demo ownership, and previous account workflow. Revision 0009 migrates existing personnel verification state while preserving their UUID, username, and Argon2 password hash. Existing accounts without documented verification require an additional registration-code check at their next successful password login. Inactive accounts remain inactive.
 

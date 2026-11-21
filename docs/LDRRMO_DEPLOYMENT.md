@@ -18,7 +18,7 @@ Registration creates a normal, immediately usable command-center account. After 
 
 ## Existing account transition
 
-The forward revision `0009_simplify_operator_registration` preserves `operators.id`, call signs, Argon2 password hashes, activation flags, and authentication sessions. Accounts with previously recorded approval become code-verified during migration. Accounts without previous approval remain unverified and cannot use a session until they sign in using their existing password **and** the developer registration code. The login screen shows that one-time field after the backend identifies an unverified account with correct credentials. Accounts explicitly deactivated by LDRRMO remain blocked. Do not manually mark unknown accounts as verified.
+The forward revision `0009_registration_cleanup` preserves `operators.id`, call signs, Argon2 password hashes, activation flags, and authentication sessions. Accounts with previously recorded approval become code-verified during migration. Accounts without previous approval remain unverified and cannot use a session until they sign in using their existing password **and** the developer registration code. The login screen shows that one-time field after the backend identifies an unverified account with correct credentials. Accounts explicitly deactivated by LDRRMO remain blocked. Do not manually mark unknown accounts as verified.
 
 Before migrating an existing database, back it up. With `DATABASE_URL` exported into the terminal:
 
@@ -29,7 +29,7 @@ python -m alembic -c alembic.ini upgrade head
 python -m alembic -c alembic.ini current
 ```
 
-Expected head: `0009_simplify_operator_registration`. **Do not** apply `backend/database/schema.sql` to a populated database, use `stamp head` to hide errors, or amend already-applied migration files. This migration removes unused account metadata and the obsolete `operator_auth` table only. Recovery requires the pre-upgrade backup.
+Expected head: `0009_registration_cleanup`. **Do not** apply `backend/database/schema.sql` to a populated database, use `stamp head` to hide errors, or amend already-applied migration files. This migration removes unused account metadata and the obsolete `operator_auth` table only. Recovery requires the pre-upgrade backup.
 
 ## Demo dataset
 

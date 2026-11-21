@@ -15,7 +15,7 @@ Operate from the updated SAFER 247 repository root. Keep your local
    PowerShell process, upgrade from backend/:
        python -m alembic -c alembic.ini current
        python -m alembic -c alembic.ini upgrade head
-   Expected current head: 0009_simplify_operator_registration.
+   Expected current head: 0009_registration_cleanup.
 4. Install backend dependencies:
        cd backend
        py -m venv .venv
