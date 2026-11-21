@@ -139,3 +139,55 @@ def test_kiss_disconnect_keeps_database_queue_unclaimed():
     worker.stop.set()
     worker._send()
     repository.claim_next.assert_not_called()
+
+
+
+def test_kiss_send_error_never_retries_after_tnc_might_have_received_bytes(tmp_path):
+    repository = Mock()
+    repository.claim_next.return_value = {
+        "id": "tx-uncertain", "kind": "text", "station": "N0CALL",
+        "text": "Help", "addressee": "ALL",
+    }
+    worker = RadioWorker(
+        repository, RadioSettings(
+            aprs_transport="kiss", storage_dir=tmp_path, output_enabled=True,
+        ),
+    )
+    worker.kiss_client = Mock(connected=True)
+
+    def possible_partial_send(_packet):
+        raise OSError("TCP connection dropped after partial send")
+
+    worker.kiss_client.send.side_effect = possible_partial_send
+    repository.fail.side_effect = lambda *_: worker.stop.set()
+    worker._send()
+    repository.mark_sending.assert_called_once_with("tx-uncertain")
+    repository.fail.assert_called_once()
+    repository.finish.assert_not_called()
+    assert worker.stop.is_set()  # No automatic requeue, operator must retry.
+
+
+def test_kiss_rejects_missing_separate_sstv_audio_instead_of_falling_back(tmp_path, monkeypatch):
+    from app.radio_lab import runtime
+    from app.radio_lab.audio_devices import AudioDeviceSelection
+
+    class FakeAudioDevices:
+        def __init__(self, settings):
+            self.input_selection = AudioDeviceSelection(
+                direction="input", device_id=1, name="Host default mic",
+                source="host-default", configured_name="Missing SSTV input",
+            )
+
+        def status(self):
+            return {}
+
+    monkeypatch.setattr(runtime, "AudioDeviceManager", FakeAudioDevices)
+    worker = RadioWorker(
+        Mock(), RadioSettings(
+            aprs_transport="kiss", kiss_sstv_input_enabled=True,
+            input_enabled=True, input_device="Missing SSTV input",
+            storage_dir=tmp_path,
+        ),
+    )
+    with pytest.raises(RuntimeError, match="refuses host-default audio fallback"):
+        worker.run()

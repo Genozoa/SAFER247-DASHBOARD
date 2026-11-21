@@ -619,6 +619,13 @@ class RadioWorker:
                 output_enabled=False,
             )
             self.audio_devices = AudioDeviceManager(audio_settings)
+            if self.settings.input_enabled and self.settings.kiss_sstv_input_enabled and not self.settings.input_command:
+                selected = self.audio_devices.input_selection
+                if selected is None or selected.source != "configured":
+                    raise RuntimeError(
+                        "KISS SSTV capture refuses host-default audio fallback; "
+                        "configure a dedicated, available RADIO_INPUT_DEVICE."
+                    )
         else:
             self.audio_devices = AudioDeviceManager(self.settings)
         capabilities, codec_errors = _codec_status(self.settings)

@@ -66,7 +66,7 @@ class RadioSettings:
         if transport == "kiss" and sstv_input and not (
             os.environ.get("RADIO_INPUT_DEVICE") or os.environ.get("RADIO_INPUT_COMMAND")
         ):
-            raise ValueError("KISS SSTV live capture requires a separate explicit input or capture command")
+            raise ValueError("KISS SSTV live capture requires an independent explicit input device or capture command")
         config = os.environ.get("RADIO_DIREWOLF_CONFIG", "").strip()
         if transport == "kiss" and manage and not config:
             raise ValueError("RADIO_DIREWOLF_CONFIG is required for managed TCP KISS")
