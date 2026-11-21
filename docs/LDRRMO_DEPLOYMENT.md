@@ -49,9 +49,23 @@ SSTV PD90 images have no authenticated incident metadata. They remain unlinked u
 
 `GET /api/operations/responders/locations` provides recent APRS positions, but radio call signs remain unverified. The Android companion is outside this repository; do not treat reported coordinates as authenticated field GPS.
 
-## Offline maps
+## Google basemap and automatic offline recovery
 
-Set `OFFLINE_TILE_DIR` to a preloaded, properly licensed `z/x/y.png` tile directory. The authenticated map API serves local tiles. With no tile pack installed, the street-map background is blank; internet-dependent alternatives remain available.
+The React/Leaflet map uses the official Google Map Tiles API through authenticated FastAPI endpoints. It defaults to **Roadmap** and offers **Satellite** (unlabelled imagery) and **Terrain**. Manual Online/Offline controls are removed. Operational markers, all 24 barangay boundaries, municipal borders, and heatmaps remain separate Leaflet overlays.
+
+Google Cloud setup:
+
+1. Create a Google Cloud project, attach an active billing account, and enable the **Map Tiles API**.
+2. Create an API key with an **API restriction** permitting only the Map Tiles API. If you restrict the key to backend server IP addresses, authorize the backend's actual public egress IP. Browser referrer restrictions are unsuitable for this server-side key.
+3. Add `GOOGLE_MAP_TILES_API_KEY=YOUR_KEY` **only to the private server/root .env**, then restart FastAPI. Never add the key to `VITE_*` variables, commit it, or embed it in frontend assets.
+4. Keep `OFFLINE_TILE_DIR` pointed at an independently licensed local XYZ tile set (`z/x/y.png`). Do **not** cache Google tiles for offline use.
+
+Roadmap sessions apply the official `poi` label visibility rule plus transit-station label hiding. Google does not offer equivalent JSON styling for Satellite or Terrain. Satellite renders without Google's roadmap label overlay; Terrain may contain labels that cannot be suppressed. The renderer displays **Google Maps** branding and requests viewport-dependent copyright metadata. Do not cover these attributions with operational UI.
+
+When the online layer fails, the frontend checks an actual local tile at the current map position and zoom, then switches automatically to the local layer only if that tile exists. Every 45 seconds, or after a browser connectivity event, it checks a real Google image response and restores the user's selected Google style if successful. Authentication or quota failures use a longer 5-minute cooldown. If neither source works, the app retains local municipal/barangay vectors and shows an accurate basemap error. The app does not save or pre-download Google imagery.
+
+Official provider docs: [session tokens](https://developers.google.com/maps/documentation/tile/session_tokens), [styling](https://developers.google.com/maps/documentation/tile/style-reference), [attribution policy](https://developers.google.com/maps/documentation/tile/policies), and [pre-fetching/caching limits](https://developers.google.com/maps/documentation/tile/policies).
+
 
 ## Development commands
 
