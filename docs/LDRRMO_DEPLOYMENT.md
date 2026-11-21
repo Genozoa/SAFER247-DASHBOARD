@@ -49,51 +49,24 @@ SSTV PD90 images have no authenticated incident metadata. They remain unlinked u
 
 `GET /api/operations/responders/locations` provides recent APRS positions, but radio call signs remain unverified. The Android companion is outside this repository; do not treat reported coordinates as authenticated field GPS.
 
-## Online basemap and automatic offline recovery
+## Google basemap and automatic offline recovery
 
-The map retains the familiar V11 Leaflet controls and San Fernando coordinates, while
-preserving the newer incident markers, APRS responder trails, KDE heatmap, and all 24 barangay
-boundaries. **Roadmap uses OpenStreetMap Standard raster tiles** at
-`https://tile.openstreetmap.org/{z}/{x}/{y}.png`. This standard public service does not
-require a Google Cloud account, billing, or Google API key for ordinary interactive use.
+The React/Leaflet map uses the official Google Map Tiles API through authenticated FastAPI endpoints. It defaults to **Roadmap** and offers **Satellite** (unlabelled imagery) and **Terrain**. Manual Online/Offline controls are removed. Operational markers, all 24 barangay boundaries, municipal borders, and heatmaps remain separate Leaflet overlays.
 
-The old V11 directly requested `mt{s}.google.com/vt` raster tiles without an API key.
-Those endpoints were not an approved integration, so they are deliberately not reused.
-The supported Google Map Tiles API integration is also removed from this branch because
-its API key and billing requirements conflict with the default no-key map goal.
+Google Cloud setup:
 
-**Usage terms:** OpenStreetMap data carries ODbL attribution requirements. The browser
-sends normal tile requests (including Referer as permitted by the browser), honours
-cache headers, displays an OpenStreetMap copyright link through Leaflet, and does not
-bulk-download or prefetch tiles. The OSMF tile service is best-effort and has no SLA.
-Do not use it as the sole live disaster-response basemap or for heavy institutional
-traffic without a dedicated provider or self-hosted tile service. Official policies:
-https://operations.osmfoundation.org/policies/tiles/
-https://www.openstreetmap.org/copyright
+1. Create a Google Cloud project, attach an active billing account, and enable the **Map Tiles API**.
+2. Create an API key with an **API restriction** permitting only the Map Tiles API. If you restrict the key to backend server IP addresses, authorize the backend's actual public egress IP. Browser referrer restrictions are unsuitable for this server-side key.
+3. Add `GOOGLE_MAP_TILES_API_KEY=YOUR_KEY` **only to the private server/root .env**, then restart FastAPI. Never add the key to `VITE_*` variables, commit it, or embed it in frontend assets.
+4. Keep `OFFLINE_TILE_DIR` pointed at an independently licensed local XYZ tile set (`z/x/y.png`). Do **not** cache Google tiles for offline use.
 
-The Roadmap layer includes place names, roads, natural features, and some renderer-supplied
-POIs. Raster labels cannot be individually hidden. A configured vector basemap or
-self-hosted renderer would be necessary for selective POI removal. Satellite and Terrain
-are intentionally not offered without verified, licensed imagery services; a street map
-is not mislabelled as either one. CARTO Voyager is not used as a free no-key substitute
-because CARTO now requires an API key.
+Roadmap sessions apply the official `poi` label visibility rule plus transit-station label hiding. Google does not offer equivalent JSON styling for Satellite or Terrain. Satellite renders without Google's roadmap label overlay; Terrain may contain labels that cannot be suppressed. The renderer displays **Google Maps** branding and requests viewport-dependent copyright metadata. Do not cover these attributions with operational UI.
 
-**Automatic fallback:** A complete online tile failure triggers one bounded live
-tile check and then tests a local tile at the current map center/zoom using
-`/api/maps/tiles/{z}/{x}/{y}.png`. If `OFFLINE_TILE_DIR` has a licensed XYZ tile
-pack covering the view, the map switches to it without user interaction. If neither
-works, the existing municipal/barangay vectors and operational markers remain visible
-with an accurate basemap message. Every 60 seconds (or on browser connectivity/
-visibility events) a real online tile response is checked before restoring Roadmap,
-without resetting map center, zoom, filters, or overlays. Provider denial or rate-limit
-responses receive a five-minute cooldown. No online imagery is preloaded into offline
-storage. Avoid interpreting `navigator.onLine` alone as proof of tile availability.
+When the online layer fails, the frontend checks an actual local tile at the current map position and zoom, then switches automatically to the local layer only if that tile exists. Every 45 seconds, or after a browser connectivity event, it checks a real Google image response and restores the user's selected Google style if successful. Authentication or quota failures use a longer 5-minute cooldown. If neither source works, the app retains local municipal/barangay vectors and shows an accurate basemap error. The app does not save or pre-download Google imagery.
 
-The current offline directory is configured privately as
-`OFFLINE_TILE_DIR=...\z\x\y.png` (directory holding level subdirectories).
-Tile packs must include their own legally required attribution. No database migration
-or radio hardware is required to show the map.
- 
+Official provider docs: [session tokens](https://developers.google.com/maps/documentation/tile/session_tokens), [styling](https://developers.google.com/maps/documentation/tile/style-reference), [attribution policy](https://developers.google.com/maps/documentation/tile/policies), and [pre-fetching/caching limits](https://developers.google.com/maps/documentation/tile/policies).
+
+
 ## Development commands
 
 Install backend requirements: `python -m pip install -r app/radio_lab/requirements.txt` from `backend/`. For headless PD90 receive decoding, see `backend/app/radio_lab/README.md`.
