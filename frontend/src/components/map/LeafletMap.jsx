@@ -25,7 +25,7 @@ import { createKdeHeatmapLayer } from './KdeHeatmapLayer';
 import { getIncidentHeatmapPoints } from '../../utils/incidentData';
 import { ONLINE_LAYERS, OFFLINE_URL, OFFLINE_OPTIONS, tileCoordinates, tileUrl } from './mapProviders';
 
-// V11's original three layer buttons now use documented keyless services.
+// V11's original three Google tile buttons use direct browser requests.
 const MAP_STYLE_ICONS = { default: MapIcon, satellite: Satellite, terrain: Mountain };
 const ONLINE_RECHECK_MS = 45000;
 
@@ -284,7 +284,7 @@ export default function LeafletMap({
       zoomControl: false, // Custom zoom buttons
     });
 
-    // Match V11: load a usable keyless online map immediately.
+    // Match V11: load the direct Google Roadmap tiles immediately.
     unmountedRef.current = false;
     sourceRef.current = 'online';
     const baseLayer = createBaseTileLayer('online', 'default', map, ++revisionRef.current);

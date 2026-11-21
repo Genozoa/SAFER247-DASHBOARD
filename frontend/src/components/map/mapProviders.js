@@ -1,36 +1,38 @@
-// Public browser-facing tile services. Never bulk-download these for offline storage.
-// The licensed offline XYZ pack is served separately by FastAPI.
-const satelliteDate = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
-
+// V11's original direct Google tile URLs. These interfaces are undocumented
+// and Google does not authorize this method for Maps Platform integrations.
+// The local offline fallback remains independent and requires licensed tiles.
 export const ONLINE_LAYERS = {
   default: {
     name: 'Default',
-    description: 'OpenStreetMap roadmap with local streets and places',
-    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    description: 'Google Maps Roadmap with roads and natural topography',
+    url: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
     options: {
-      maxZoom: 18,
-      maxNativeZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',
+      subdomains: ['0', '1', '2', '3'],
+      maxZoom: 20,
+      maxNativeZoom: 20,
+      attribution: '&copy; Google Maps',
     },
   },
   satellite: {
     name: 'Satellite',
-    description: 'NASA MODIS true-colour satellite overview. Lower resolution than street-level imagery.',
-    url: `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/${satelliteDate}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
+    description: 'Google Maps Satellite with roads and place labels',
+    url: 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
     options: {
-      maxZoom: 18,
-      maxNativeZoom: 9,
-      attribution: 'Imagery &copy; <a href="https://www.earthdata.nasa.gov/data/instruments/modis">NASA EOSDIS / MODIS Terra</a>',
+      subdomains: ['0', '1', '2', '3'],
+      maxZoom: 20,
+      maxNativeZoom: 20,
+      attribution: '&copy; Google Maps Imagery',
     },
   },
   terrain: {
     name: 'Terrain',
-    description: 'OpenTopoMap-R contours and terrain features',
-    url: 'https://tile.openmaps.fr/opentopomap/{z}/{x}/{y}.png',
+    description: 'Google Maps topography and hillshading',
+    url: 'https://mt{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',
     options: {
-      maxZoom: 18,
-      maxNativeZoom: 17,
-      attribution: '<a href="https://github.com/sletuffe/OpenTopoMap">&copy; OpenTopoMap-R</a> <a href="https://openmaps.fr/donate">Support tile hosting</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',
+      subdomains: ['0', '1', '2', '3'],
+      maxZoom: 20,
+      maxNativeZoom: 20,
+      attribution: '&copy; Google Maps Terrain',
     },
   },
 };
@@ -44,6 +46,10 @@ export function tileCoordinates(map, maxNativeZoom = 18) {
   return { z, x: Math.floor(pixel.x / 256), y: Math.floor(pixel.y / 256) };
 }
 
+// Leaflet substitutes {s} on its own. Probes use subdomain 0 explicitly.
 export function tileUrl(template, { z, x, y }) {
-  return template.replace('{z}', String(z)).replace('{x}', String(x)).replace('{y}', String(y));
+  return template.replace('{s}', '0')
+    .replace('{z}', String(z))
+    .replace('{x}', String(x))
+    .replace('{y}', String(y));
 }
