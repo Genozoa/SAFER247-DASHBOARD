@@ -29,7 +29,7 @@ python -m alembic -c alembic.ini upgrade head
 python -m alembic -c alembic.ini current
 ```
 
-Expected head: `0009_registration_cleanup`. **Do not** apply `backend/database/schema.sql` to a populated database, use `stamp head` to hide errors, or amend already-applied migration files. This migration removes unused account metadata and the obsolete `operator_auth` table only. Recovery requires the pre-upgrade backup.
+Expected head: `0009_registration_cleanup`. **Do not** apply `backend/database/schema.sql` to a populated database, use `stamp head` to hide errors, or amend already-applied migration files. This migration removes obsolete account metadata while preserving existing password hashes. Recovery requires the pre-upgrade backup.
 
 ## Demo dataset
 

@@ -8,7 +8,7 @@ This branch changes authentication and Messaging without changing the radio fram
 | Legacy accounts | Revision 0009 retains previously authorized sessions/accounts and requires code verification for legacy unverified accounts | PostgreSQL migration smoke test and login transition tests |
 | Credential input icons | lucide-react inline call-sign, password, confirmation, and code icons; visibility buttons remain keyboard-accessible | Desktop/mobile visual QA |
 | Messaging | Text-only APRS composer with received image/geolocation icons restored | Frontend build and radio processing tests |
-| Authentication internals | Removed old fingerprint metadata and approval admin UI/CLI, retained Argon2 password verification and cookies | Backend test suite |
+| Authentication internals | Retained Argon2 per-account password verification and HTTP-only cookie sessions | Backend test suite |
 
 Other earlier development work remains unchanged: APRS/SSTV worker, manually reviewed image correlation, recent responder positions, PostgreSQL-only synthetic records, local tile route, and 10-second visible-tab polling.
 
