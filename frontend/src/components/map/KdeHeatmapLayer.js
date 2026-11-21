@@ -1,8 +1,9 @@
 import L from 'leaflet';
+import { geographicRadiusPixels, kernelIntersectsViewport } from './heatmapScale.js';
 
 /**
  * Kernel Density Estimation (KDE) Heatmap Layer for Leaflet.
- * Uses a bivariate Gaussian radial kernel to accumulate density fields on an HTML5 canvas,
+ * Uses a geographically fixed radial kernel to accumulate incident density on a canvas,
  * then maps accumulated density values to a smooth, continuous disaster risk color ramp.
  */
 export class KdeHeatmapLayer extends L.Layer {
@@ -10,9 +11,9 @@ export class KdeHeatmapLayer extends L.Layer {
     super();
     this._latlngs = latlngs; // Array of [lat, lng, weight]
     this._options = {
-      radius: options.radius || 36,
-      blur: options.blur || 22,
-      max: options.max || 1.0,
+      // A fixed ground distance, not CSS pixels. Zoom changes only the projection.
+      radiusMeters: options.radiusMeters ?? 4000,
+      max: options.max ?? 1.0,
       minOpacity: options.minOpacity || 0.05,
       gradient: options.gradient || {
         0.15: 'rgba(59, 130, 246, 0.6)',  // Blue (Low density / sparse incident)
@@ -136,16 +137,15 @@ export class KdeHeatmapLayer extends L.Layer {
   _getKernelStamp() {
     if (this._circleStamp) return this._circleStamp;
 
-    const r = this._options.radius;
-    const blur = this._options.blur;
-    const d = (r + blur) * 2;
-
+    // Keep the stamp small at every zoom; scale it onto the geographic footprint
+    // when drawing. Creating a stamp thousands of pixels wide at high zoom
+    // would consume excessive memory.
+    const d = 128;
+    const center = d / 2;
     const stamp = document.createElement('canvas');
     stamp.width = d;
     stamp.height = d;
     const ctx = stamp.getContext('2d');
-
-    const center = r + blur;
     const gradient = ctx.createRadialGradient(center, center, 0, center, center, center);
 
     // Continuous Gaussian decay approximation
@@ -200,29 +200,37 @@ export class KdeHeatmapLayer extends L.Layer {
     if (!this._latlngs || this._latlngs.length === 0) return;
 
     const kernel = this._getKernelStamp();
-    const kernelRadius = this._options.radius + this._options.blur;
-    const bounds = this._map.getBounds();
+    const zoom = this._map.getZoom();
+    const radiusMeters = this._options.radiusMeters;
+    const maxWeight = Math.max(Number(this._options.max) || 1, Number.EPSILON);
 
-    // 1. Accumulate density onto alpha channel
+    // 1. Rasterize a kernel with constant real-world reach for every incident.
+    // The same points and weights retain the same spatial influence and color
+    // at all zoom levels. Only their projected on-screen size changes.
     for (let i = 0; i < this._latlngs.length; i++) {
       const item = this._latlngs[i];
       const lat = item[0] ?? item.lat;
       const lng = item[1] ?? item.lng;
-      const weight = item[2] ?? item.intensity ?? item.weight ?? 0.7;
-
-      // Check roughly within view
-      if (!bounds.pad(0.2).contains([lat, lng])) continue;
+      const weight = Number(item[2] ?? item.intensity ?? item.weight ?? 1);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)
+          || !Number.isFinite(weight) || weight <= 0) continue;
 
       const point = this._map.latLngToContainerPoint([lat, lng]);
+      const radiusPx = geographicRadiusPixels(radiusMeters, lat, zoom);
+      if (!Number.isFinite(radiusPx) || radiusPx <= 0
+          || !kernelIntersectsViewport(point.x, point.y, radiusPx, width, height)) continue;
 
-      // Draw radial Gaussian kernel scaled by weight
-      ctx.globalAlpha = Math.min(Math.max(weight * 0.75, 0.08), 1.0);
+      // Preserve the same data-weight scale when the user zooms.
+      ctx.globalAlpha = Math.min(weight / maxWeight * 0.75, 1);
       ctx.drawImage(
         kernel,
-        point.x - kernelRadius,
-        point.y - kernelRadius
+        point.x - radiusPx,
+        point.y - radiusPx,
+        radiusPx * 2,
+        radiusPx * 2
       );
     }
+    ctx.globalAlpha = 1;
 
     // 2. Colorize using the KDE palette
     const imgData = ctx.getImageData(0, 0, width, height);

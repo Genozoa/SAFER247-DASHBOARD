@@ -63,7 +63,7 @@ export default function LeafletMap({
   const [mapType, setMapType] = useState('default');
   const [showMunicipalBorder, setShowMunicipalBorder] = useState(true);
   const [showBarangayPolygons, setShowBarangayPolygons] = useState(true);
-  const [kdeRadius, setKdeRadius] = useState(36);
+  const [kdeRadiusMeters, setKdeRadiusMeters] = useState(4000);
   const [isMapReady, setIsMapReady] = useState(false);
   const [currentZoom, setCurrentZoom] = useState(11);
   const [allowedMinZoom, setAllowedMinZoom] = useState(10);
@@ -749,8 +749,7 @@ export default function LeafletMap({
 
     if (mode === 'Heatmap') {
       const kdeLayer = createKdeHeatmapLayer(kdePoints, {
-        radius: kdeRadius,
-        blur: 22,
+        radiusMeters: kdeRadiusMeters,
         max: 1.0,
         minOpacity: 0.05,
       });
@@ -764,7 +763,7 @@ export default function LeafletMap({
         kdeHeatLayerRef.current = null;
       }
     };
-  }, [isMapReady, mode, kdePoints, kdeRadius]);
+  }, [isMapReady, mode, kdePoints, kdeRadiusMeters]);
 
   return (
     <div className="leaflet-map-wrapper">
@@ -860,17 +859,17 @@ export default function LeafletMap({
             </div>
           </div>
           <div className="kde-bandwidth-control">
-            <span className="kde-bandwidth-label">Kernel Bandwidth:</span>
+            <span className="kde-bandwidth-label">Geographic Radius:</span>
             <div className="kde-radius-chips">
-              {[26, 36, 48].map((r) => (
+              {[2500, 4000, 6000].map((meters) => (
                 <button
-                  key={r}
+                  key={meters}
                   type="button"
-                  className={kdeRadius === r ? 'active' : ''}
-                  onClick={() => setKdeRadius(r)}
-                  title={`Set Gaussian KDE bandwidth radius to ${r}px`}
+                  className={kdeRadiusMeters === meters ? 'active' : ''}
+                  onClick={() => setKdeRadiusMeters(meters)}
+                  title={`Incident influence radius: ${meters / 1000} km, constant at every zoom`}
                 >
-                  {r === 26 ? 'Compact' : r === 36 ? 'Standard' : 'Broad'} ({r}px)
+                  {meters === 2500 ? 'Compact' : meters === 4000 ? 'Standard' : 'Broad'} ({meters / 1000} km)
                 </button>
               ))}
             </div>
