@@ -24,6 +24,13 @@ class RadioSettings:
     output_dir: Path = field(default_factory=lambda: Path("app/radio_lab/var/outgoing"))
     gen_packets: str = "gen_packets"
     atest: str = "atest"
+    aprs_transport: str = "wav"
+    kiss_host: str = "127.0.0.1"
+    kiss_port: int = 8001
+    kiss_manage_direwolf: bool = True
+    direwolf_executable: str = "direwolf"
+    direwolf_config: Path | None = None
+    kiss_sstv_input_enabled: bool = False
     sample_rate: int = 48000
     input_command: tuple[str, ...] = ()
     output_command: tuple[str, ...] = ()
@@ -45,6 +52,24 @@ class RadioSettings:
         timeout = float(os.environ.get("RADIO_COMMAND_TIMEOUT", "60"))
         if not 1 <= timeout <= 300:
             raise ValueError("RADIO_COMMAND_TIMEOUT must be between 1 and 300 seconds")
+        transport = os.environ.get("RADIO_APRS_TRANSPORT", "wav").lower().strip()
+        if transport not in {"wav", "kiss"}:
+            raise ValueError("RADIO_APRS_TRANSPORT must be wav or kiss")
+        host = os.environ.get("RADIO_KISS_HOST", "127.0.0.1").strip()
+        if host != "127.0.0.1":
+            raise ValueError("RADIO_KISS_HOST must be 127.0.0.1 (loopback only)")
+        port = int(os.environ.get("RADIO_KISS_PORT", "8001"))
+        if not 1 <= port <= 65535:
+            raise ValueError("RADIO_KISS_PORT must be between 1 and 65535")
+        manage = os.environ.get("RADIO_KISS_MANAGE_DIREWOLF", "true").lower() in {"1", "true", "yes"}
+        sstv_input = os.environ.get("RADIO_KISS_SSTV_INPUT_ENABLED", "false").lower() in {"1", "true", "yes"}
+        if transport == "kiss" and sstv_input and not (
+            os.environ.get("RADIO_INPUT_DEVICE") or os.environ.get("RADIO_INPUT_COMMAND")
+        ):
+            raise ValueError("KISS SSTV live capture requires a separate explicit input or capture command")
+        config = os.environ.get("RADIO_DIREWOLF_CONFIG", "").strip()
+        if transport == "kiss" and manage and not config:
+            raise ValueError("RADIO_DIREWOLF_CONFIG is required for managed TCP KISS")
         return cls(
             enabled=os.environ.get("RADIO_ENABLED", "false").lower() in {"1", "true", "yes"},
             station=os.environ.get("RADIO_STATION", "N0CALL").upper(),
@@ -53,6 +78,13 @@ class RadioSettings:
             output_dir=Path(os.environ.get("RADIO_OUTPUT_DIR", str(storage / "outgoing"))).resolve(),
             gen_packets=os.environ.get("RADIO_GEN_PACKETS", "gen_packets"),
             atest=os.environ.get("RADIO_ATEST", "atest"),
+            aprs_transport=transport,
+            kiss_host=host,
+            kiss_port=port,
+            kiss_manage_direwolf=manage,
+            direwolf_executable=os.environ.get("RADIO_DIREWOLF_EXE", "direwolf"),
+            direwolf_config=Path(config).resolve() if config else None,
+            kiss_sstv_input_enabled=sstv_input,
             sample_rate=sample_rate,
             input_command=_command("RADIO_INPUT_COMMAND"),
             output_command=_command("RADIO_OUTPUT_COMMAND"),
