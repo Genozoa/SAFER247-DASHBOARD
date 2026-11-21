@@ -51,7 +51,6 @@ def test_model_tables_and_postgres_specific_types_match_schema() -> None:
         "media_attachments",
         "image_enhancements",
         "responder_locations",
-        "operator_auth",
         "auth_sessions",
     }
     assert set(Base.metadata.tables) == expected_tables
@@ -67,6 +66,7 @@ def test_model_tables_and_postgres_specific_types_match_schema() -> None:
     assert set(Operator.__table__.c.keys()) >= {
         "username",
         "password_hash",
+        "registration_verified_at",
     }
     assert "display_name" not in Operator.__table__.c
     assert Barangay.__table__.c.boundary.type.geometry_type == "MULTIPOLYGON"
