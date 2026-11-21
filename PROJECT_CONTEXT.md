@@ -1,4 +1,4 @@
-> **Updated implementation:** Authentication requires a private registration code and explicit operator approval; frontend demo records were removed. See [docs/LDRRMO_DEPLOYMENT.md](docs/LDRRMO_DEPLOYMENT.md). The historical notes below describe earlier prototypes.
+> **Current authentication:** Server-verified Argon2 registration code, direct account creation, and standard sign-in. See [docs/LDRRMO_DEPLOYMENT.md](docs/LDRRMO_DEPLOYMENT.md).
 
 # SAFER 247 — Project Context
 
@@ -247,7 +247,7 @@ to conflict:
 
 The codebase contains React/Vite frontend and FastAPI backend with PostgreSQL/PostGIS. The main capabilities cover Dashboard, Messaging, Map View, Reports, Settings, authenticated radio APIs, and an independent APRS/SSTV radio worker.
 
-The current operational interface requires backend API/database access. New staff accounts require a private developer registration code and administrator approval. Roles distinguish viewer, operator and administrator privileges. The demo is a database-only account with isolated synthetic records, not a frontend fallback.
+The current operational interface requires backend API/database access. New staff accounts require the developer's privately provided registration code. Staff register directly and use their own call sign and password to sign in. The demo is a database-only account with isolated synthetic records, not a frontend fallback.
 
 Officer tracking displays recent APRS radio positions. Their claimed callsigns are not cryptographically authenticated. SSTV PD90 images require explicit reviewed correlation to an incident; no automatic recency pairing.
 

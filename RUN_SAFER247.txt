@@ -1,88 +1,46 @@
-SAFER 247 - WINDOWS STARTUP AND SCHEMA GUIDE
-=============================================
+SAFER 247 - WINDOWS DEVELOPMENT STARTUP
+======================================
 
-Work from your local SAFER 247 repository folder, not a hard-coded Windows path.
-Follow docs/LDRRMO_DEPLOYMENT.md before moving real emergency data or enabling radios.
+Operate from the updated SAFER 247 repository root. Keep your local
+.env file private and untracked.
 
-1. REQUIREMENTS: Python 3.11+, Node.js 22, PostgreSQL with PostGIS,
-   PowerShell, and an authorized developer for the registration code.
-
-2. CONFIGURE:
-   Copy .env.example to .env at repository root. Replace the placeholder
-   DATABASE_URL, PASSWORD_FINGERPRINT_SECRET (32+ random bytes), and
-   OPERATOR_REGISTRATION_CODE in this PRIVATE file.
-   During the prototype, OPERATOR_REGISTRATION_CODE is capstone.
-   Set RADIO_ENABLED=false until authorized audio hardware is configured.
-   APP_ENV=production requires HTTPS for secure session cookies.
-   Never copy .env to a public source control branch.
-
-3. INSTALL from the repository root in PowerShell:
-
-   cd backend
-   py -m venv .venv
-   .\.venv\Scripts\Activate.ps1
-   python -m pip install -r app/radio_lab/requirements.txt
-   cd ../frontend
-   npm ci
-   cd ..
-
-   The radio decoder may need additional native dependencies described in
-   backend/app/radio_lab/README.md. Online installation is required once.
-
-4. DATABASE (BACK UP BEFORE RUNNING):
-   Set DATABASE_URL into the same PowerShell process as Alembic.
-   For example, assign $env:DATABASE_URL from your private .env value.
-   Do not paste the password into screenshots or public code.
-
-   cd backend
-   python -m alembic -c alembic.ini current
-   python -m alembic -c alembic.ini upgrade head
-   cd ..
-
-   Expected latest Alembic version: 0008_sample_data_ownership.
-   Do not run old backend/database/schema.sql against an existing database.
-
-5. START:
-   Execute Run-SAFER247.ps1 from PowerShell at the repo root to start
-   separate API/frontend windows after explicitly confirming migration.
-   Alternatively launch the API from backend via:
-       python -m uvicorn app.main:app --reload --port 8000
-   and the frontend from frontend via:
-       npm run dev
-   Local frontend is http://localhost:3000.
-   It requires the backend and database; local demo bypass is removed.
-
-6. AUTHORIZE PERSONNEL:
-   Enter the developer registration code in the web registration form.
-   The account enters pending approval without an authenticated session.
-   On the developer computer bootstrap an approved first administrator:
+1. Install Python 3.11+, PostgreSQL/PostGIS, Node.js 22, npm, Git and VS Code.
+2. Copy .env.example to .env and configure DATABASE_URL.
+   Generate an Argon2 registration-code hash in a backend terminal:
+       python -m app.auth.registration_code
+   Enter your privately supplied code twice. Copy the resulting
+   OPERATOR_REGISTRATION_CODE_HASH line to root .env.
+   Leave RADIO_ENABLED=false for UI-only development.
+3. Back up any existing database. With DATABASE_URL exported into your
+   PowerShell process, upgrade from backend/:
+       python -m alembic -c alembic.ini current
+       python -m alembic -c alembic.ini upgrade head
+   Expected current head: 0009_simplify_operator_registration.
+4. Install backend dependencies:
        cd backend
-       python -m app.auth.approve_operator YOUR_CALL_SIGN --role admin
-   The CLI prompts for the private code. Log in as administrator and use
-   Settings > Personnel access approvals to grant verified staff access.
-   Viewer cannot transmit, Operator can transmit, Admin can approve staff.
-
-7. DEMO DATA (DEVELOPMENT DATABASE ONLY):
-   Put DEMO_OPERATOR_CALL_SIGN=Demo and a private strong
-   DEMO_OPERATOR_PASSWORD into .env. From backend, run:
+       py -m venv .venv
+       .\.venv\Scripts\Activate.ps1
+       python -m pip install -r app/radio_lab/requirements.txt
+5. If you need synthetic data, configure DEMO_OPERATOR_CALL_SIGN=Demo and
+   DEMO_OPERATOR_PASSWORD in .env, load both values into this terminal,
+   then from backend/ run:
        python -m app.auth.seed_demo --confirm-demo-seed
-   In psql connected to the correct development database, execute:
-       backend/database/seed_demo.sql
-   Read backend/database/DEMO_DATA.md first. Demo uses synthetic database
-   records and is denied live radio endpoints.
+   From the project root run backend/database/seed_demo.sql against a
+   disposable development database with psql or pgAdmin Query Tool.
+6. Start FastAPI from backend/:
+       python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+7. Open another PowerShell terminal:
+       cd frontend
+       npm ci
+       npm run dev
+   Browse http://localhost:3000 and API docs at http://127.0.0.1:8000/docs.
+8. Register with the privately supplied code, then sign in. Existing
+   accounts previously recorded as verified keep login access.
+   Previously unverified accounts must provide the code at their next
+   successful password login to establish access.
+9. Validate:
+       cd backend; python -m pytest -q
+       cd frontend; npm test; npm run build
 
-8. OFFLINE MAP:
-   Set OFFLINE_TILE_DIR to a locally licensed XYZ tile pack directory
-   containing z/x/y.png. The app serves tiles via authenticated API.
-   No tile pack ships in this repo. Online layers still need internet.
-
-9. VERIFY:
-   Backend:  python -m pytest -q
-   Frontend: npm test
-             npm run build
-   GitHub Actions CI runs these on pushes/PRs when workflows are enabled.
-
-RADIO SECURITY: Web login does not encrypt broadcasts or authenticate APRS
-callsigns; treat them as unverified until the field/receiver protocol supports
-cryptographic identity. Do not deploy this branch for live emergency response
-until tests, migrations, RF hardware and Android integration are verified.
+The Demo account cannot send radio transmissions. Local map tiles must be
+pre-provisioned separately. See docs/LDRRMO_DEPLOYMENT.md for full guidance.

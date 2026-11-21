@@ -1,45 +1,66 @@
-# SAFER 247 LDRRMO developer deployment guide
+# SAFER 247: Local LDRRMO deployment
 
-## Current implementation and boundaries
-All account registration and operational data are database-backed. The React app has no demo-mode bypass. Backend/API and PostgreSQL/PostGIS must run for login and dashboard operation.
+## Authentication and personnel access
 
-Only authorized San Fernando LDRRMO personnel should receive a developer registration code. A correct code **creates a pending account request only**. A human administrator must approve it. This is a prototype shared secret, not employee identity verification. Set `OPERATOR_REGISTRATION_CODE=capstone` in the **private server .env** only during the capstone prototype. Replace it before stakeholder deployment, use HTTPS, restrict network access, and add rate limiting. Never include that code in frontend/public files.
+The Command Center uses FastAPI authentication, Argon2 password hashing, revocable HTTP-only cookie sessions, and PostgreSQL. Personnel registration requires the developer-issued registration code, initially `capstone`. Its salted Argon2 hash belongs in the backend's private root `.env`. The browser receives no registration code or hash except the code the person enters in the form.
 
-Operator roles: `viewer` reads permitted incident/message/map data, `operator` also sends/retries/cancels transmissions and manually links SSTV images, `admin` also reviews operators. Old operator rows become unapproved after migration. No account is automatically made administrator.
+In a backend terminal, with the virtual environment activated, generate the hash:
 
-## Existing-database upgrade
-1. Back up your PostgreSQL database before migration.
-2. Confirm PostGIS is enabled and the `DATABASE_URL` environment variable points to your intended database.
-3. From `backend/`, execute `python -m alembic -c alembic.ini current`, then `python -m alembic -c alembic.ini upgrade head`.
-4. Verify `SELECT version_num FROM alembic_version;` returns `0008_sample_data_ownership`. The migration chain runs `0006_operator_approval`, `0007_image_correlation_audit`, and `0008_sample_data_ownership` after existing `0005_canceled_radio_status`.
-5. On the developer computer, approve an existing, physically verified account as first administrator:
-   `python -m app.auth.approve_operator YOUR_CALL_SIGN --role admin`
-   The command prompts for the private developer registration code and never prints the code.
-6. Sign in as that administrator and open **Settings > Personnel access approvals**. Verify each pending applicant's employment in person before selecting Approve. Grant only the role needed.
-7. To remove a person's access, select Revoke. Existing sessions become invalid. You must review legacy accounts one by one.
+```powershell
+python -m app.auth.registration_code
+```
 
-## Development-only sample database
-In the server's private `.env` set `DEMO_OPERATOR_CALL_SIGN=Demo` and a unique strong `DEMO_OPERATOR_PASSWORD`. Then from `backend/` run `python -m app.auth.seed_demo --confirm-demo-seed` (development mode only). From the repository root, run the SQL file `backend/database/seed_demo.sql` using psql connected to the development database. It adds 120 synthetic incidents and 180 synthetic messages. Only the approved viewer `Demo` account sees these records. There is no frontend-generated demo data and no real transmission from the synthetic messages. **Do not run against production**.
+Enter the new code twice at the hidden terminal prompts. Copy the generated `OPERATOR_REGISTRATION_CODE_HASH=...` value into the **private** repository-root `.env`. Do not retain `OPERATOR_REGISTRATION_CODE` in the file. To rotate, run the same command again and replace the hash, then restart FastAPI. Configure `APP_ENV=production` only behind HTTPS.
+
+The built-in throttle permits up to five registration-code verification attempts per client IP over 15 minutes, with a process-level total budget. The throttle stores counters in the API process, not in PostgreSQL. **Production requires an upstream shared rate limiter or trusted reverse proxy enforcement** if the API runs multiple processes or multiple servers. The API must not directly trust user-supplied forwarded headers. Use a longer unpredictable shared code before production. A code alone cannot attest employment, so the developer must provide it only to verified LDRRMO personnel in person.
+
+Registration creates a normal, immediately usable command-center account. After registering, the operator signs in with their call sign and password. No approval controls or administrator account are required.
+
+## Existing account transition
+
+The forward revision `0009_simplify_operator_registration` preserves `operators.id`, call signs, Argon2 password hashes, activation flags, and authentication sessions. Accounts with previously recorded approval become code-verified during migration. Accounts without previous approval remain unverified and cannot use a session until they sign in using their existing password **and** the developer registration code. The login screen shows that one-time field after the backend identifies an unverified account with correct credentials. Accounts explicitly deactivated by LDRRMO remain blocked. Do not manually mark unknown accounts as verified.
+
+Before migrating an existing database, back it up. With `DATABASE_URL` exported into the terminal:
+
+```powershell
+cd backend
+python -m alembic -c alembic.ini current
+python -m alembic -c alembic.ini upgrade head
+python -m alembic -c alembic.ini current
+```
+
+Expected head: `0009_simplify_operator_registration`. **Do not** apply `backend/database/schema.sql` to a populated database, use `stamp head` to hide errors, or amend already-applied migration files. This migration removes unused account metadata and the obsolete `operator_auth` table only. Recovery requires the pre-upgrade backup.
+
+## Demo dataset
+
+On a development database only, set `DEMO_OPERATOR_CALL_SIGN=Demo` and `DEMO_OPERATOR_PASSWORD` to a new strong password. From `backend/`, run:
+
+```powershell
+python -m app.auth.seed_demo --confirm-demo-seed
+```
+
+From repository root use `backend/database/seed_demo.sql` in pgAdmin Query Tool or `psql`. The dataset adds 120 fictional incidents and 180 fictional incoming/outgoing messages. The `Demo` operator only sees its own synthetic records. Demo accounts cannot queue, retry, or send radio traffic, nor access live radio data. Read [DEMO_DATA.md](../backend/database/DEMO_DATA.md).
 
 ## Radio image correlation
-SSTV PD90 audio does not supply authenticated incident metadata. Received images stay unlinked by default. A verified LDRRMO operator must independently check the sender/report through a trusted procedure and use `POST /api/operations/images/{attachment_uuid}/correlate` with `{"report_code":"...", "confirm":true, "verification_notes":"..."}`. The API records reviewer, time and notes. It **does not** cryptographically authenticate the RF sender. A dedicated UI for the manual review is not yet implemented.
+
+SSTV PD90 images have no authenticated incident metadata. They remain unlinked until an LDRRMO operator confirms the association through `POST /api/operations/images/{attachment_uuid}/correlate`. The backend records the operator, time, and verification notes. This manual record is not cryptographic RF sender authentication.
 
 ## Responder tracking
-`GET /api/operations/responders/locations` serves recent APRS-derived coordinates to signed-in operators and connects to the Map tracking view. These beacons are **not cryptographically authenticated**. The user interface identifies them as unverified radio observations, not verified officer GPS. The companion Android app's secure positional identity remains outside this repository.
+
+`GET /api/operations/responders/locations` provides recent APRS positions, but radio call signs remain unverified. The Android companion is outside this repository; do not treat reported coordinates as authenticated field GPS.
 
 ## Offline maps
-The map defaults to local XYZ tiles via `/api/maps/tiles/{z}/{x}/{y}.png`. Set `OFFLINE_TILE_DIR` to an existing legally sourced and pre-provisioned folder containing `z/x/y.png`. The API checks access via operator session. Without an installed tile pack, the offline base layer is blank, although municipal/barangay outlines still render. Online Google layers remain optional and depend on the internet, so this is an **offline tile-serving foundation**, not an out-of-the-box offline street map. Do not bulk-download Google tiles without appropriate licensing.
 
-## Polling, scaling, and access
-Operations lists default to 500 rows and accept `limit` (1 to 500) and `offset`. Frontend refreshes every 10 seconds only in visible tabs. Large-history UI pagination and actual real-time push are not implemented. Retain archives in PostgreSQL; do not confuse dashboard limit with full historical totals.
+Set `OFFLINE_TILE_DIR` to a preloaded, properly licensed `z/x/y.png` tile directory. The authenticated map API serves local tiles. With no tile pack installed, the street-map background is blank; internet-dependent alternatives remain available.
 
-## Run and verify
-- Backend: `python -m pytest -q` from `backend/`
-- Frontend: `npm ci && npm test && npm run build` from `frontend/`
-- Migrations: `python -m alembic -c alembic.ini upgrade head` from `backend/` after a backup
-- CI: `.github/workflows/ci.yml` installs Python and Node dependencies and runs backend/frontend checks on GitHub.
+## Development commands
 
-This branch has **not** been verified with live PostGIS migration, radio hardware, Android, or pre-provisioned offline tiles. Do not merge/deploy without these checks.
+Install backend requirements: `python -m pip install -r app/radio_lab/requirements.txt` from `backend/`. For headless PD90 receive decoding, see `backend/app/radio_lab/README.md`.
 
-## Cleanup
-`frontend/src/data/demoData.js` and `frontend/src/data/operationalData.js` were removed from runtime. Sample data fixtures now live under `frontend/tests/fixtures/`. The original `backend/database/schema.sql` is historical and does not include the latest migrations. Always use Alembic to upgrade existing databases.
+Start API: `python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000` from `backend/`.
+
+Install frontend: `npm ci` from `frontend/`, then start `npm run dev`. Browse `http://localhost:3000`.
+
+Backend tests: `python -m pytest -q`. Frontend tests: `npm test`. Frontend build: `npm run build`.
+
+All migration, test, radio hardware, Android, and deployment paths must be validated before a real emergency-response rollout.
