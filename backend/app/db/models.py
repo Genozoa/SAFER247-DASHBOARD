@@ -38,9 +38,10 @@ class Operator(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("true")
     )
-    is_approved: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
-    role: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'viewer'"))
-    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Null only for existing accounts that have not yet verified the developer code.
+    registration_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -53,34 +54,9 @@ class Operator(Base):
     image_enhancements: Mapped[list["ImageEnhancement"]] = relationship(
         back_populates="operator"
     )
-    auth_metadata: Mapped["OperatorAuth | None"] = relationship(
-        back_populates="operator", cascade="all, delete-orphan", uselist=False
-    )
     auth_sessions: Mapped[list["AuthSession"]] = relationship(
         back_populates="operator", cascade="all, delete-orphan"
     )
-
-
-class OperatorAuth(Base):
-    __tablename__ = "operator_auth"
-    __table_args__ = (
-        UniqueConstraint(
-            "password_fingerprint", name="uq_operator_auth_password_fingerprint"
-        ),
-    )
-
-    operator_id: Mapped[UUID] = mapped_column(
-        PostgreSQLUUID(as_uuid=True),
-        ForeignKey(
-            "operators.id",
-            name="fk_operator_auth_operator_id_operators",
-            ondelete="CASCADE",
-        ),
-        primary_key=True,
-    )
-    password_fingerprint: Mapped[str] = mapped_column(Text, nullable=False)
-
-    operator: Mapped[Operator] = relationship(back_populates="auth_metadata")
 
 
 class AuthSession(Base):

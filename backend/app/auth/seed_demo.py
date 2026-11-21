@@ -6,13 +6,11 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 
 from app.auth.security import (
-    PasswordConfigurationError,
     hash_password,
-    password_fingerprint,
     password_policy_errors,
     verify_password,
 )
-from app.db.models import Operator, OperatorAuth
+from app.db.models import Operator
 from app.db.session import create_session_factory, get_engine
 
 
@@ -23,43 +21,20 @@ def seed_demo_operator(
     errors = password_policy_errors(password)
     if errors:
         raise ValueError("Demo password must contain " + ", ".join(errors) + ".")
-    fingerprint = password_fingerprint(password)
     factory = create_session_factory(get_engine())
     with factory() as db:
         existing = db.scalar(select(Operator).where(Operator.username == call_sign))
         if existing is not None:
-            existing_auth = db.get(OperatorAuth, existing.id)
-            if (
-                existing_auth is not None
-                and existing_auth.password_fingerprint == fingerprint
-                and verify_password(password, existing.password_hash)
-            ):
+            if verify_password(password, existing.password_hash):
                 return False
-            raise ValueError(
-                "The configured demo call sign belongs to a different account."
-            )
-        if db.scalar(
-            select(OperatorAuth.operator_id).where(
-                OperatorAuth.password_fingerprint == fingerprint
-            )
-        ):
-            raise ValueError("This password is taken.")
+            raise ValueError("The configured demo call sign belongs to a different account.")
 
         operator = Operator(
             username=call_sign,
             password_hash=hash_password(password),
-            is_approved=True,
-            role="viewer",
-            approved_at=datetime.now(timezone.utc),
+            registration_verified_at=datetime.now(timezone.utc),
         )
         db.add(operator)
-        db.flush()
-        db.add(
-            OperatorAuth(
-                operator_id=operator.id,
-                password_fingerprint=fingerprint,
-            )
-        )
         db.commit()
         return True
 
@@ -89,7 +64,7 @@ def main() -> int:
         )
     try:
         created = seed_demo_operator(call_sign, password)
-    except (PasswordConfigurationError, ValueError, RuntimeError) as error:
+    except (ValueError, RuntimeError) as error:
         print(str(error), file=sys.stderr)
         return 1
     print("Demo operator created." if created else "Demo operator already exists.")
