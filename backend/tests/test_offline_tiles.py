@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 import pytest
 
 from app.auth.api import current_principal
+from app.db.session import get_db_session
 from app.maps.api import router
 
 
@@ -42,5 +43,7 @@ def test_out_of_bounds_tile_is_rejected(client):
 def test_local_tiles_require_authentication():
     app = FastAPI()
     app.include_router(router)
+    # No token should be rejected before any database query is needed.
+    app.dependency_overrides[get_db_session] = lambda: object()
     with TestClient(app) as client:
         assert client.get("/api/maps/tiles/0/0/0.png").status_code == 401
