@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
-import { RadioTower, LockKeyhole, Eye, EyeOff, KeyRound } from 'lucide-react';
+import { RadioTower, LockKeyhole, Eye, EyeOff } from 'lucide-react';
 import './auth.css';
 
 export default function AuthPage() {
@@ -12,11 +12,8 @@ export default function AuthPage() {
   const [callSign, setCallSign] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [registrationCode, setRegistrationCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [showRegistrationCode, setShowRegistrationCode] = useState(false);
-  const [needsLegacyVerification, setNeedsLegacyVerification] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -33,17 +30,14 @@ export default function AuthPage() {
     setSubmitting(true);
     try {
       if (isRegister) {
-        await register(callSign.trim(), password, registrationCode);
+        await register(callSign.trim(), password);
         navigate('/login', { replace: true, state: { registrationCompleted: true } });
         return;
       } else {
-        await login(callSign.trim(), password, needsLegacyVerification ? registrationCode : undefined);
+        await login(callSign.trim(), password);
       }
       navigate('/', { replace: true });
     } catch (requestError) {
-      if (!isRegister && requestError.message.includes('Existing account requires registration-code verification.')) {
-        setNeedsLegacyVerification(true);
-      }
       setError(requestError.message);
     } finally {
       setSubmitting(false);
@@ -62,11 +56,11 @@ export default function AuthPage() {
         <h1 id="auth-title">{isRegister ? 'Create operator account' : 'Operator sign in'}</h1>
         <p className="auth-description">
           {isRegister
-            ? 'Personnel registration requires a code supplied in person by the developer.'
+            ? 'Create an operator account using your call sign and a strong password.'
             : 'Sign in to access the SAFER 247 command center.'}
         </p>
 
-        {isRegister && <div className="auth-warning" role="note">Authorized San Fernando LDRRMO personnel only. Never share your password or registration code.</div>}
+        {isRegister && <div className="auth-warning" role="note">For authorized San Fernando LDRRMO personnel. Keep your sign-in credentials private.</div>}
         {!isRegister && location.state?.registrationCompleted && <div className="auth-notice" role="status">Account created. Sign in with your call sign and password.</div>}
         {(serviceError || error) && (
           <div className="auth-alert" role="alert">{error || serviceError}</div>
@@ -131,43 +125,12 @@ export default function AuthPage() {
                   {showConfirm ? <EyeOff size={19} aria-hidden="true" /> : <Eye size={19} aria-hidden="true" />}
                 </button>
               </div>
-              <label htmlFor="auth-registration-code">Personnel registration code</label>
-              <div className="auth-input-field">
-                <KeyRound className="auth-field-icon" size={19} aria-hidden="true" />
-                <input id="auth-registration-code" name="registrationCode"
-                  type={showRegistrationCode ? 'text' : 'password'} autoComplete="off"
-                  placeholder="Enter your registration code" maxLength={256} required
-                  value={registrationCode} onChange={(event) => setRegistrationCode(event.target.value)} />
-                <button className="auth-visibility-icon" type="button" aria-pressed={showRegistrationCode}
-                  aria-label={showRegistrationCode ? 'Hide registration code' : 'Show registration code'}
-                  onClick={() => setShowRegistrationCode((v) => !v)}>
-                  {showRegistrationCode ? <EyeOff size={19} aria-hidden="true" /> : <Eye size={19} aria-hidden="true" />}
-                </button>
-              </div>
               <p className="auth-hint">
                 Use at least 8 characters with uppercase and lowercase letters, a number, and a symbol.
               </p>
             </>
           )}
 
-          {!isRegister && needsLegacyVerification && (
-            <>
-              <label htmlFor="auth-registration-code">Verify existing account</label>
-              <div className="auth-input-field">
-                <KeyRound className="auth-field-icon" size={19} aria-hidden="true" />
-                <input id="auth-registration-code" name="registrationCode"
-                  type={showRegistrationCode ? 'text' : 'password'} autoComplete="off"
-                  placeholder="Enter your registration code" maxLength={256} required
-                  value={registrationCode} onChange={(event) => setRegistrationCode(event.target.value)} />
-                <button className="auth-visibility-icon" type="button" aria-pressed={showRegistrationCode}
-                  aria-label={showRegistrationCode ? 'Hide registration code' : 'Show registration code'}
-                  onClick={() => setShowRegistrationCode((v) => !v)}>
-                  {showRegistrationCode ? <EyeOff size={19} aria-hidden="true" /> : <Eye size={19} aria-hidden="true" />}
-                </button>
-              </div>
-              <p className="auth-hint">Enter the developer registration code once to verify this existing account.</p>
-            </>
-          )}
           <button className="auth-submit" type="submit" disabled={submitting}>
             {submitting
               ? 'Please wait…'

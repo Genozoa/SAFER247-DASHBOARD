@@ -1,7 +1,6 @@
 """Browser session routing required by the authenticated radio API."""
 
 from fastapi.testclient import TestClient
-from argon2 import PasswordHasher
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 
@@ -12,7 +11,6 @@ from app.main import create_app
 
 
 def test_session_cookie_reaches_radio_and_operations_and_logout_clears_paths(monkeypatch):
-    monkeypatch.setenv("OPERATOR_REGISTRATION_CODE_HASH", PasswordHasher().hash("ci-test-only"))
     engine = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
@@ -37,8 +35,7 @@ def test_session_cookie_reaches_radio_and_operations_and_logout_clears_paths(mon
             client.cookies.set(SESSION_COOKIE, "legacy", path="/api/auth")
             registered = client.post(
                 "/api/auth/register",
-                json={"call_sign": "N0CALL", "password": "Strong!Pass9",
-                      "registration_code": "ci-test-only"},
+                json={"call_sign": "N0CALL", "password": "Strong!Pass9"},
             )
             assert registered.status_code == 201
             assert client.get("/api/radio/auth-cookie-probe").status_code == 401

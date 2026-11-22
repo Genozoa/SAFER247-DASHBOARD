@@ -32,22 +32,21 @@ export function AuthProvider({ children }) {
     refresh();
   }, [refresh]);
 
-  const login = useCallback(async (callSign, password, registrationCode) => {
+  const login = useCallback(async (callSign, password) => {
     const authenticatedOperator = await request('/auth/login', {
       method: 'POST',
-      body: { call_sign: callSign, password, ...(registrationCode !== undefined ? { registration_code: registrationCode } : {}) },
+      body: { call_sign: callSign, password },
     });
     setOperator(authenticatedOperator);
     setServiceError('');
   }, []);
 
-  const register = useCallback(async (callSign, password, registrationCode) => {
+  const register = useCallback(async (callSign, password) => {
     const authenticatedOperator = await request('/auth/register', {
       method: 'POST',
       body: {
         call_sign: callSign,
         password,
-        registration_code: registrationCode,
       },
     });
     setServiceError('');

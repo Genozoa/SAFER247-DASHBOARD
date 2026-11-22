@@ -2,13 +2,11 @@ import sys
 from datetime import datetime, timezone
 
 import pytest
-from argon2 import PasswordHasher
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 
 from app.auth import seed_demo
-from app.auth.registration_code import attempt_limiter
 from app.auth.security import password_policy_errors, verify_password
 from app.db.models import AuthSession, Operator
 from app.db.session import create_session_factory, get_db_session
@@ -17,8 +15,6 @@ from app.main import create_app
 
 @pytest.fixture
 def auth_client(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("OPERATOR_REGISTRATION_CODE_HASH", PasswordHasher().hash("capstone"))
-    attempt_limiter.reset()
     engine = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool,
     )
@@ -36,20 +32,18 @@ def auth_client(monkeypatch: pytest.MonkeyPatch):
     with TestClient(app) as client:
         yield client, factory
     engine.dispose()
-    attempt_limiter.reset()
 
 
-def register(client: TestClient, call_sign="DEMO-1", password="Strong!Pass9", code="capstone"):
+def register(client: TestClient, call_sign="DEMO-1", password="Strong!Pass9"):
     return client.post("/api/auth/register", json={
-        "call_sign": call_sign, "password": password, "registration_code": code,
+        "call_sign": call_sign, "password": password,
     })
 
 
-def login(client: TestClient, call_sign="DEMO-1", password="Strong!Pass9", code=None):
-    payload = {"call_sign": call_sign, "password": password}
-    if code is not None:
-        payload["registration_code"] = code
-    return client.post("/api/auth/login", json=payload)
+def login(client: TestClient, call_sign="DEMO-1", password="Strong!Pass9"):
+    return client.post("/api/auth/login", json={
+        "call_sign": call_sign, "password": password,
+    })
 
 
 def test_password_policy_requires_all_character_types():
@@ -79,7 +73,6 @@ def test_register_login_logout_and_session_revocation(auth_client):
         account = session.query(Operator).one()
         assert account.password_hash != "Strong!Pass9"
         assert verify_password("Strong!Pass9", account.password_hash)
-        assert account.registration_verified_at is not None
 
     assert client.get("/api/auth/me").status_code == 401
     logged_in = login(client)
@@ -137,7 +130,6 @@ def test_demo_seed_is_idempotent_and_does_not_replace_accounts(auth_client, monk
     with factory() as session:
         operator = session.query(Operator).filter_by(username="DEMO-OP").one()
         assert operator.password_hash != "Demo!Pass123"
-        assert operator.registration_verified_at is not None
 
 
 def test_demo_seed_requires_explicit_opt_in_and_refuses_production(monkeypatch):
@@ -150,48 +142,26 @@ def test_demo_seed_requires_explicit_opt_in_and_refuses_production(monkeypatch):
         seed_demo.main()
 
 
-def test_registration_requires_valid_code(auth_client):
+def test_registration_needs_no_personnel_code(auth_client):
     client, factory = auth_client
-    invalid = register(client, "OUTSIDE", code="wrong")
-    assert invalid.status_code == 403
+    response = register(client, call_sign="NEW-OP")
+    assert response.status_code == 201
+    assert response.json()["call_sign"] == "NEW-OP"
+    assert login(client, call_sign="NEW-OP").status_code == 200
     with factory() as session:
-        assert session.query(Operator).count() == 0
+        assert session.query(Operator).filter_by(username="NEW-OP").one()
 
 
-def test_missing_code_configuration_disables_registration(auth_client, monkeypatch):
-    client, _ = auth_client
-    monkeypatch.delenv("OPERATOR_REGISTRATION_CODE_HASH")
-    assert register(client).status_code == 503
-
-
-def test_registration_code_attempt_limit(auth_client):
-    client, factory = auth_client
-    for attempt in range(5):
-        assert register(client, f"GUESS-{attempt}", code="wrong").status_code == 403
-    last = register(client, "LAST", code="capstone")
-    assert last.status_code == 429
-    assert "Retry-After" in last.headers
-    with factory() as session:
-        assert session.query(Operator).count() == 0
-
-
-def test_legacy_unverified_account_requires_credential_and_code(auth_client):
+def test_existing_active_account_retains_authentication(auth_client):
     client, factory = auth_client
     assert register(client).status_code == 201
     with factory() as session:
-        account = session.query(Operator).one()
-        original = account.password_hash
-        account.registration_verified_at = None
-        session.commit()
-    assert login(client).status_code == 403
-    assert login(client, password="wrong", code="capstone").status_code == 401
-    assert login(client, code="wrong").status_code == 403
-    assert login(client, code="capstone").status_code == 200
+        operator = session.query(Operator).one()
+        previous_hash = operator.password_hash
+        assert operator.is_active is True
+    assert login(client).status_code == 200
     with factory() as session:
-        account = session.query(Operator).one()
-        assert account.password_hash == original
-        assert account.registration_verified_at is not None
-    assert client.get("/api/auth/me").status_code == 200
+        assert session.query(Operator).one().password_hash == previous_hash
 
 
 def test_disabled_operator_cannot_login(auth_client):
