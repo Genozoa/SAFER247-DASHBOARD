@@ -20,9 +20,9 @@ DECLARE
     longitude double precision;
     reported timestamptz;
 BEGIN
-    SELECT id INTO demo_id FROM operators WHERE username = 'Demo' AND registration_verified_at IS NOT NULL;
+    SELECT id INTO demo_id FROM operators WHERE username = 'Demo';
     IF demo_id IS NULL THEN
-        RAISE EXCEPTION 'Create the approved viewer-only Demo operator using seed_demo first.';
+        RAISE EXCEPTION 'Create the Demo operator using seed_demo first.';
     END IF;
     IF EXISTS(SELECT 1 FROM incident_reports WHERE report_code = 'DEMO-0001') THEN
         RAISE NOTICE 'Synthetic dataset already exists; skipping reseed.';

@@ -1,7 +1,6 @@
 import argparse
 import os
 import sys
-from datetime import datetime, timezone
 
 from sqlalchemy import select
 
@@ -32,7 +31,6 @@ def seed_demo_operator(
         operator = Operator(
             username=call_sign,
             password_hash=hash_password(password),
-            registration_verified_at=datetime.now(timezone.utc),
         )
         db.add(operator)
         db.commit()

@@ -8,7 +8,6 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.auth.registration_code import verify_registration_code
 from app.auth.security import hash_session_token, password_policy_errors
 from app.auth.service import authenticate_operator, register_operator
 from app.db.models import AuthSession, Operator
@@ -31,15 +30,6 @@ class Credentials(BaseModel):
         if not normalized:
             raise ValueError("Call sign is required.")
         return normalized
-
-
-class RegistrationCredentials(Credentials):
-    registration_code: str = Field(min_length=1, max_length=256)
-
-
-class LoginCredentials(Credentials):
-    # Existing, never-verified accounts supply a code only during first sign-in.
-    registration_code: str | None = Field(default=None, max_length=256)
 
 
 class CallSignChange(BaseModel):
@@ -92,8 +82,7 @@ def current_principal(request: Request, db: DBSession) -> Principal:
             AuthSession.expires_at > datetime.now(timezone.utc),
         )
     )
-    if (auth_session is None or not auth_session.operator.is_active
-            or auth_session.operator.registration_verified_at is None):
+    if auth_session is None or not auth_session.operator.is_active:
         raise HTTPException(status_code=401, detail="Authentication required.")
     return Principal(auth_session.operator, auth_session)
 
@@ -137,11 +126,9 @@ def _integrity_error_response(db: Session, call_sign: str) -> HTTPException:
 
 @router.post("/register", response_model=OperatorView, status_code=201)
 def register(
-    payload: RegistrationCredentials,
-    request: Request,
+    payload: Credentials,
     db: DBSession,
 ) -> OperatorView:
-    verify_registration_code(payload.registration_code, request)
     if payload.call_sign.casefold() == "demo":
         raise HTTPException(status_code=409, detail="The Demo call sign is reserved.")
     _check_password(payload.password)
@@ -157,16 +144,9 @@ def register(
 
 @router.post("/login", response_model=OperatorView)
 def login(
-    payload: LoginCredentials, request: Request, response: Response, db: DBSession,
+    payload: Credentials, response: Response, db: DBSession,
 ) -> OperatorView:
-    try:
-        verifier = (lambda: verify_registration_code(payload.registration_code, request)) if payload.registration_code is not None else None
-        result = authenticate_operator(
-            db, payload.call_sign, payload.password,
-            verify_existing_registration=verifier if payload.registration_code is not None else None,
-        )
-    except PermissionError as error:
-        raise HTTPException(status_code=403, detail=str(error)) from error
+    result = authenticate_operator(db, payload.call_sign, payload.password)
     if result is None:
         db.rollback()
         raise HTTPException(status_code=401, detail="Invalid call sign or password.")
