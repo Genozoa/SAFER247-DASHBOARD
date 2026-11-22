@@ -2,34 +2,23 @@
 
 ## Authentication and personnel access
 
-The Command Center uses FastAPI authentication, Argon2 password hashing, revocable HTTP-only cookie sessions, and PostgreSQL. Personnel registration requires the developer-issued registration code, initially `capstone`. Its salted Argon2 hash belongs in the backend's private root `.env`. The browser receives no registration code or hash except the code the person enters in the form.
+SAFER 247 uses FastAPI, PostgreSQL, Argon2 password hashes, and revocable HTTP-only cookie sessions. Registration asks for a unique call sign, a strong password, and password confirmation. Users sign in with their call sign and password. No personnel code or administrator approval is required.
 
-In a backend terminal, with the virtual environment activated, generate the hash:
-
-```powershell
-python -m app.auth.registration_code
-```
-
-Enter the new code twice at the hidden terminal prompts. Copy the generated `OPERATOR_REGISTRATION_CODE_HASH=...` value into the **private** repository-root `.env`. Do not retain `OPERATOR_REGISTRATION_CODE` in the file. To rotate, run the same command again and replace the hash, then restart FastAPI. Configure `APP_ENV=production` only behind HTTPS.
-
-The built-in throttle permits up to five registration-code verification attempts per client IP over 15 minutes, with a process-level total budget. The throttle stores counters in the API process, not in PostgreSQL. **Production requires an upstream shared rate limiter or trusted reverse proxy enforcement** if the API runs multiple processes or multiple servers. The API must not directly trust user-supplied forwarded headers. Use a longer unpredictable shared code before production. A code alone cannot attest employment, so the developer must provide it only to verified LDRRMO personnel in person.
-
-Registration creates a normal, immediately usable command-center account. After registering, the operator signs in with their call sign and password. No approval controls or administrator account are required.
+This simplifies local capstone testing but removes the previous personnel gate. **Anyone who reaches `/api/auth/register` can register and receive ordinary operator access.** Do not expose the application publicly for operational LDRRMO use without controlling who can access the registration endpoint, and apply upstream rate limits.
 
 ## Existing account transition
 
-The forward revision `0009_registration_cleanup` preserves `operators.id`, call signs, Argon2 password hashes, activation flags, and authentication sessions. Accounts with previously recorded approval become code-verified during migration. Accounts without previous approval remain unverified and cannot use a session until they sign in using their existing password **and** the developer registration code. The login screen shows that one-time field after the backend identifies an unverified account with correct credentials. Accounts explicitly deactivated by LDRRMO remain blocked. Do not manually mark unknown accounts as verified.
+Back up PostgreSQL/PostGIS before migrating. The new `0010_remove_registration_code` revision removes the obsolete verification column. It preserves all operator identities, existing Argon2 password hashes, sessions, and active/inactive flags. Only active accounts can sign in; previously unverified active accounts will no longer need additional verification.
 
-Before migrating an existing database, back it up. With `DATABASE_URL` exported into the terminal:
+Run from `backend/` after loading `DATABASE_URL` into the PowerShell process:
 
 ```powershell
-cd backend
 python -m alembic -c alembic.ini current
 python -m alembic -c alembic.ini upgrade head
 python -m alembic -c alembic.ini current
 ```
 
-Expected head: `0009_registration_cleanup`. **Do not** apply `backend/database/schema.sql` to a populated database, use `stamp head` to hide errors, or amend already-applied migration files. This migration removes obsolete account metadata while preserving existing password hashes. Recovery requires the pre-upgrade backup.
+Expected head: `0010_remove_registration_code`. Do not apply the historical `schema.sql` over populated databases or rewrite applied migrations.
 
 ## Demo dataset
 

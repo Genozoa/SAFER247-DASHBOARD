@@ -15,8 +15,8 @@ Dependencies, database data and radio drivers are installed on your own machine;
 they are not bundled inside this source archive.
 
 1. From the project root, copy .env.example to .env and configure DATABASE_URL
-   and OPERATOR_REGISTRATION_CODE_HASH with your private values.
-   Generate the hash using python -m app.auth.registration_code from backend/.
+   and configure other necessary private backend values.
+   No personnel registration code is needed.
 2. From backend/, create/activate a Python virtual environment and export the
    root configuration before installing dependencies/running migrations.
    Alembic does not automatically read the root .env file:

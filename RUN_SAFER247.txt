@@ -1,46 +1,39 @@
 SAFER 247 - WINDOWS DEVELOPMENT STARTUP
 ======================================
 
-Operate from the updated SAFER 247 repository root. Keep your local
-.env file private and untracked.
+Operate from the GPT-branch2 repository root. Keep your local .env private.
 
-1. Install Python 3.11+, PostgreSQL/PostGIS, Node.js 22, npm, Git and VS Code.
-2. Copy .env.example to .env and configure DATABASE_URL.
-   Generate an Argon2 registration-code hash in a backend terminal:
-       python -m app.auth.registration_code
-   Enter your privately supplied code twice. Copy the resulting
-   OPERATOR_REGISTRATION_CODE_HASH line to root .env.
-   Leave RADIO_ENABLED=false for UI-only development.
-3. Back up any existing database. With DATABASE_URL exported into your
-   PowerShell process, upgrade from backend/:
+1. Install Python 3.11+, PostgreSQL/PostGIS, Node.js 22, npm, and Git.
+2. Copy .env.example to .env and set DATABASE_URL, APP_ENV, and local radio settings.
+   No personnel registration code is required.
+   Keep RADIO_ENABLED=false for UI-only development.
+3. Back up your current database. Load DATABASE_URL from the root .env into the
+   current PowerShell process. From backend/:
        python -m alembic -c alembic.ini current
        python -m alembic -c alembic.ini upgrade head
-   Expected current head: 0009_registration_cleanup.
+   Expected head: 0010_remove_registration_code.
 4. Install backend dependencies:
        cd backend
        py -m venv .venv
        .\.venv\Scripts\Activate.ps1
        python -m pip install -r app/radio_lab/requirements.txt
-5. If you need synthetic data, configure DEMO_OPERATOR_CALL_SIGN=Demo and
-   DEMO_OPERATOR_PASSWORD in .env, load both values into this terminal,
-   then from backend/ run:
+5. If synthetic data is needed, configure DEMO_OPERATOR_CALL_SIGN=Demo
+   and DEMO_OPERATOR_PASSWORD in .env and load them into your process:
        python -m app.auth.seed_demo --confirm-demo-seed
-   From the project root run backend/database/seed_demo.sql against a
-   disposable development database with psql or pgAdmin Query Tool.
+   Apply backend/database/seed_demo.sql in a disposable development database.
 6. Start FastAPI from backend/:
        python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-7. Open another PowerShell terminal:
+7. In a second PowerShell terminal:
        cd frontend
        npm ci
        npm run dev
    Browse http://localhost:3000 and API docs at http://127.0.0.1:8000/docs.
-8. Register with the privately supplied code, then sign in. Existing
-   accounts previously recorded as verified keep login access.
-   Previously unverified accounts must provide the code at their next
-   successful password login to establish access.
-9. Validate:
+8. Register with a call sign and strong password. No approval or code step.
+   Anyone with endpoint access could self-register. Keep operational
+   deployments private and restrict registration before public exposure.
+9. Verify:
        cd backend; python -m pytest -q
        cd frontend; npm test; npm run build
 
-The Demo account cannot send radio transmissions. Local map tiles must be
-pre-provisioned separately. See docs/LDRRMO_DEPLOYMENT.md for full guidance.
+The Demo account cannot transmit radio data. Radio uses the existing
+WAV/spool architecture, not TCP KISS. See docs/LDRRMO_DEPLOYMENT.md.
